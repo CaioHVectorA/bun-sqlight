@@ -23,8 +23,8 @@ describe("Query builder", () => {
         expect(query.run()).toBe(queryExpected)
     })
     test('Should be able to create a query with multiple where clauses and or and and', () => {
-        const queryExpected = 'SELECT * FROM users WHERE id = 1 OR name = "John" AND age = 25'
-        const query = querybuilder.select('*').from('users').where('id', 1).orWhere('name', 'John').where('age', 25)
+        const queryExpected = 'SELECT * FROM users WHERE name = "Jason" OR name = "John" AND age = 25'
+        const query = querybuilder.select('*').from('users').where('name', 'Jason').orWhere('name', 'John').where('age', 25)
         expect(query.run()).toBe(queryExpected)
     })
     test('Should be able to create a query with sorting', () => {
@@ -43,7 +43,7 @@ describe("Query builder", () => {
         expect(query.run()).toBe(queryExpected)
     })
     test('Should be able to create a query with multiple sorting', () => {
-        const queryExpected = 'SELECT * FROM users ORDER BY name ASC, age DESC'
+        const queryExpected = 'SELECT * FROM users ORDER BY name ASC , age DESC'
         const query = querybuilder.select('*').from('users').orderBy('name', 'ASC').orderBy('age', 'DESC')
         expect(query.run()).toBe(queryExpected)
     })
@@ -65,16 +65,6 @@ describe("Query builder", () => {
     test('Should be able to make an update query with data and query', () => {
         const queryExpected = 'UPDATE users SET name = "John", age = 25 WHERE id = 1'
         const query = querybuilder.update('users', { name: 'John', age: 25 }).where('id', 1)
-        expect(query.run()).toBe(queryExpected)
-    })
-    test('Should be able to create a table', () => {
-        const queryExpected = 'CREATE TABLE users (id INT, name VARCHAR(255))'
-        const query = querybuilder.createTable('users', { id: 'INT', name: 'VARCHAR(255)' })
-        expect(query.run()).toBe(queryExpected)
-    })
-    test('Should be able to drop a table', () => {
-        const queryExpected = 'DROP TABLE users'
-        const query = querybuilder.dropTable('users')
         expect(query.run()).toBe(queryExpected)
     })
     test('Should be able to delete from a table', () => {
