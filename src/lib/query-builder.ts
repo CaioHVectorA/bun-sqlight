@@ -41,6 +41,10 @@ export class QueryBuilder implements IQueryBuilder {
         return this
     }
     where(field: string, value: any): this {
+        if (this.actualQuery.find(part => part.query.includes('WHERE'))) {
+            this.actualQuery.push({ query: `${field} = ${typeof value === 'string' ? `"${value}"` : value}`, level: QueryLevel.WHERE })
+            return this
+        }
         this.actualQuery.push({ query: `WHERE ${field} = ${typeof value === 'string' ? `"${value}"` : value}`, level: QueryLevel.WHERE })
         return this
     }
@@ -49,6 +53,10 @@ export class QueryBuilder implements IQueryBuilder {
         return this
     }
     orderBy(field: string, direction: 'ASC' | 'DESC'): this {
+        if (this.actualQuery.find(part => part.query.includes('ORDER BY'))) {
+            this.actualQuery.push({ query: `, ${field} ${direction}`, level: QueryLevel.ORDER_LIMIT })
+            return this
+        }
         this.actualQuery.push({ query: `ORDER BY ${field} ${direction}`, level: QueryLevel.ORDER_LIMIT })
         return this
     }
@@ -70,6 +78,14 @@ export class QueryBuilder implements IQueryBuilder {
     }
     update(table: string, data: { [key: string]: any }): this {
         this.actualQuery.push({ query: `UPDATE ${table} SET ${Object.entries(data).map(([key, value]) => `${key} = ${typeof value === 'string' ? `"${value}"` : value}`).join(', ')}`, level: QueryLevel.CLAUSE })
+        return this
+    }
+    delete(table: string): this {
+        this.actualQuery.push({ query: `DELETE FROM ${table}`, level: QueryLevel.CLAUSE })
+        return this
+    }
+    offset(offset: number): this {
+        this.actualQuery.push({ query: `OFFSET ${offset}`, level: QueryLevel.ORDER_LIMIT })
         return this
     }
     run(): string {
