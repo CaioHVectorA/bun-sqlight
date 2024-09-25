@@ -59,3 +59,7 @@ You can use the bun-sqlight to automatically run all migrations:
 $ bun-sqlight migrate
 ```
 All TS or JS files in the `migrations` directory will be executed.
+
+## Contributing
+
+Any contribution is welcome! Please check the [todo.md](todo.md) file to see what needs to be done, and you can open a PR or a issue to help us improve the project!
