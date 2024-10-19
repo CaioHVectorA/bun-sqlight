@@ -12,4 +12,13 @@ describe("Tables and schema", () => {
         const query = querybuilder.dropTable('users')
         expect(query.run()).toBe(queryExpected)
     })
+    // with callbacks with shchema object
+    test('Should be able to create a table with schema fallback', () => {
+        const queryExpected = 'CREATE TABLE users (id INT, name VARCHAR(255))'
+        const query = querybuilder.createTable('users', (table) => {
+            table.id()
+            table.string('name')
+        })
+        expect(query.run()).toBe(queryExpected)
+    })
 })

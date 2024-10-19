@@ -1,21 +1,20 @@
-enum QueryLevel {
+import { createSchemaCallback, Schema } from "./schema"
+
+export enum QueryLevel {
     CLAUSE = 1,
     TABLE = 2,
     WHERE = 3,
     ORDER_LIMIT = 4
 }
-type QueryPart = {
+export type QueryPart = {
     query: string,
     level: QueryLevel
 }
-// query:
-// SELECT * FROM users WHERE id = 1
-
-// Should give the same result as:
-// from("users").select('*').where('id', 1)
-// where('id', 1).select("*").from("users")
-// select("*").where('id', 1).from("users")
+interface SchemaOptions {
+    exists?: boolean
+}
 export interface IQueryBuilder {
+    queryBrute?: string
     actualQuery: QueryPart[]
     select(fields: string | string[]): this
     from(table: string): this
@@ -31,6 +30,7 @@ export interface IQueryBuilder {
 }
 
 export class QueryBuilder implements IQueryBuilder {
+    queryBrute?: string
     actualQuery: QueryPart[] = []
     select(fields: string | string[]): this {
         this.actualQuery.push({ query: `SELECT ${Array.isArray(fields) ? fields.join(', ') : fields}`, level: QueryLevel.CLAUSE })
@@ -68,9 +68,15 @@ export class QueryBuilder implements IQueryBuilder {
         this.actualQuery.push({ query: `DROP TABLE ${table}`, level: QueryLevel.TABLE })
         return this
     }
-    createTable(table: string, fields: { [key: string]: string }): this {
+    createTable(table: string, fields: ({ [key: string]: string } | ((schema: Schema) => void)), options: SchemaOptions = { exists: true }): this {
+        if (typeof fields === 'function') {
+            console.log('callback')
+            createSchemaCallback(table, fields, this)
+            return this
+        }
         this.actualQuery.push({ query: `CREATE TABLE ${table} (${Object.entries(fields).map(([key, value]) => `${key} ${value}`).join(', ')})`, level: QueryLevel.TABLE })
         return this
+        // SELECT * FROM users
     }
     insert(table: string, data: { [key: string]: any }): this {
         this.actualQuery.push({ query: `INSERT INTO ${table} (${Object.keys(data).join(', ')}) VALUES (${Object.values(data).map(value => typeof value === 'string' ? `"${value}"` : value).join(', ')})`, level: QueryLevel.CLAUSE })
@@ -89,7 +95,7 @@ export class QueryBuilder implements IQueryBuilder {
         return this
     }
     run(): string {
-        const query = ``
+        if (this.queryBrute) return this.queryBrute
         const sorted = this.actualQuery.sort((a, b) => a.level - b.level)
         // add AND clause logic
         const queryWithAnd = sorted.map((part, index) => {
@@ -105,4 +111,3 @@ export class QueryBuilder implements IQueryBuilder {
     }
 }
 
-const querybuilder = new QueryBuilder()
