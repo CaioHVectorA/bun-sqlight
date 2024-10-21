@@ -15,6 +15,15 @@
 - [ ] Add a query logging system
 - [ ] Add excepction approach
 
+## DX
+- [] Add api layer erros, like using select, delete, update without from
+- [] Add api layer warnings, to prevent update or delete without where clause -> maybe the userr want to deactivate this config 
+
+## Docs
+- [] Create docs frontend
+
+
+
 ## Project
 - [ ] Logo for the project
 - [ ] Website Documentation
