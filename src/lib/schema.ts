@@ -67,14 +67,13 @@ export class Schema implements TableSchemaHandles {
 
 export function createSchemaCallback(table: string, callback: (schema: Schema) => void, queryBuilder: IQueryBuilder) {
     const schema = new Schema(table, new QueryBuilder())
-
     callback(schema)
     const commands =  schema.queryBuilder.actualQuery
+    console.log({ commands })
     let query = `CREATE TABLE ${table} (${commands.map(command => command.query).join(', ')})`
     // remove more of one space on query to one space
     query = query.replace(/\s{2,}/g, ' ')
     queryBuilder.queryBrute = query
-    console.log({ query })
     // transpile commands to create table syntax
 }
 

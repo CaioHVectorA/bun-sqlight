@@ -1,3 +1,6 @@
+import { createDatabaseManager } from "./db-manager"
+import { Database } from 'bun:sqlite'
+import type { Hooks } from "./hooks"
 import { createSchemaCallback, Schema } from "./schema"
 
 export enum QueryLevel {
@@ -15,6 +18,7 @@ interface SchemaOptions {
 }
 export interface IQueryBuilder {
     queryBrute?: string
+    hooks: Hooks
     actualQuery: QueryPart[]
     select(fields: string | string[]): this
     from(table: string): this
@@ -30,6 +34,7 @@ export interface IQueryBuilder {
 }
 
 export class QueryBuilder implements IQueryBuilder {
+    hooks: Hooks = {}
     queryBrute?: string
     actualQuery: QueryPart[] = []
     select(fields: string | string[]): this {
@@ -110,4 +115,15 @@ export class QueryBuilder implements IQueryBuilder {
         return queryWithAnd.join(' ')
     }
 }
-
+const qb = new QueryBuilder()
+const db = createDatabaseManager(qb, new Database('f.db')) as QueryBuilder
+qb.hooks.beforeInsert = [(queryPart) => {
+    console.log('before insert', queryPart)
+}]
+db.createTable('users', table => {
+    table.uuid(),
+    table.string('name')
+    table.integer('age')
+})
+console.log(qb.insert('users', { name: 'John Doe', age: 18 }).run())
+console.log(db.select('*').from('users').run())
