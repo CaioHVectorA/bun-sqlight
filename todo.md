@@ -4,6 +4,9 @@
 - [ ] Add a schema builder and CLI
     - [X] Add a schema interface with callback
     - [ ] Add hooks to automatically set some columns like (id, created_at, updated_at, uuid)
+        - [ ] UUID
+        - [ ] Created_at
+        - [ ] Updated_at
     - [ ] Add, refine and test the API for the schema builder
     - [ ] Add a CLI to generate the schema
     - [ ] Setup a migration architecture

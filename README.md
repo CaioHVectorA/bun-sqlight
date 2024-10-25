@@ -10,8 +10,8 @@ Bun sqlight is a simple and lightweight Sqlite abstraction layer for Bun sqlite 
 ### Initialize
 
 ```ts
-import { BunSqlite } from 'bun-sqlight';
-const db = new BunSqlite('mydb.sqlite');
+import { BunSqlight } from 'bun-sqlight';
+const db = new BunSqlight('myDb.db');
 ```
 
 ### Usage
@@ -19,7 +19,9 @@ const db = new BunSqlite('mydb.sqlite');
 ```ts
 db.from('users').select('name', 'email').where('id', 1).get();
 // same result:
+db.select(['name', 'email']).from('users').where('id', 1).get();
 db.select('name', 'email').from('users').where('id', 1).get();
+
 
 // CRUD:
 db.from('users').insert({ name: 'John', email: 'john@gm.co'}).set()
