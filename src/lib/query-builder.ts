@@ -1,5 +1,5 @@
-import { createDatabaseManager } from "./db-manager"
 import { Database } from 'bun:sqlite'
+import { DatabaseManager } from './db-manager'
 import type { Hooks } from "./hooks"
 import { createSchemaCallback, Schema } from "./schema"
 
@@ -18,7 +18,7 @@ interface SchemaOptions {
 }
 export interface IQueryBuilder {
     queryBrute?: string
-    hooks: Hooks
+    db?: DatabaseManager
     actualQuery: QueryPart[]
     select(fields: string | string[]): this
     from(table: string): this
@@ -34,8 +34,8 @@ export interface IQueryBuilder {
 }
 
 export class QueryBuilder implements IQueryBuilder {
-    hooks: Hooks = {}
     queryBrute?: string
+    db?: DatabaseManager
     actualQuery: QueryPart[] = []
     select(fields: string | string[]): this {
         this.actualQuery.push({ query: `SELECT ${Array.isArray(fields) ? fields.join(', ') : fields}`, level: QueryLevel.CLAUSE })
@@ -116,14 +116,14 @@ export class QueryBuilder implements IQueryBuilder {
     }
 }
 const qb = new QueryBuilder()
-const db = createDatabaseManager(qb, new Database('f.db')) as QueryBuilder
-qb.hooks.beforeInsert = [(queryPart) => {
-    console.log('before insert', queryPart)
-}]
+const db = new DatabaseManager(qb, new Database('f.db')) as unknown as QueryBuilder
+console.log(qb.db)
 db.createTable('users', table => {
     table.uuid(),
     table.string('name')
     table.integer('age')
 })
-console.log(qb.insert('users', { name: 'John Doe', age: 18 }).run())
+Array.from({ length: 100 }).forEach((_, index) => {
+    db.insert('users', { name: `John Doe ${index}`, age: 18 + index }).run()
+})
 console.log(db.select('*').from('users').run())

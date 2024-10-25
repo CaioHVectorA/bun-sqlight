@@ -1,37 +1,53 @@
 import { Database } from 'bun:sqlite';
 import { QueryBuilder } from './query-builder';
 import { MetricTimer } from '../utils/metric-timer';
+import type { Hooks } from './hooks';
 
-export function createDatabaseManager(builder: QueryBuilder, db: Database) {
-    const manager = {} as any;
+export class DatabaseManager {
+    private builder: QueryBuilder;
+    private db: Database;
+    hooks: Hooks = {
+        afterInsert: [],
+        afterUpdate: [],
+        beforeInsert: [],
+        beforeUpdate: [],
+        beforeSelect: [],
+        afterSelect: [],
+    };
+    constructor(builder: QueryBuilder, db: Database) {
+        this.builder = builder;
+        this.db = db;
+        this.builder.db = this;
+        // Copiar dinamicamente todos os métodos do QueryBuilder para o manager
+        const queryBuilderMethods = Object.getOwnPropertyNames(QueryBuilder.prototype).filter(method => method !== 'constructor');
 
-    // Copiar dinamicamente todos os métodos do QueryBuilder para o manager
-    const queryBuilderMethods = Object.getOwnPropertyNames(QueryBuilder.prototype).filter(method => method !== 'constructor');
+        queryBuilderMethods.forEach(method => {
+            (this as any)[method] = (...args: any[]) => {
+                // Executa o método no builder
+                const builderResult = (this.builder as any)[method](...args);
+                if (method == 'insert') {
+                    console.log('Insert!', builderResult.actualQuery)
+                    const callbacks = this.hooks.beforeInsert.filter(action => {
+                        return !!(action[args[0]])
+                    }).map(action => action[args[0]]);
+                    callbacks.forEach(callback => {
+                        const resQuery = callback((builderResult as QueryBuilder).actualQuery)
+                    })
+                    // this.hooks.beforeInsert.forEach(hook => hook[this.builder.actualQuery[1].query](builderResult));
+                }
+                if (method.toUpperCase().includes('TABLE')) {
+                    this.db.exec(builderResult.run()); // Executa a query no banco
+                    this.builder.queryBrute = undefined;
+                    return;
+                }
+                if (method === 'run') {
+                    const query = this.builder.run(); // Obter a query final
+                    // return this.db.query(builderResult).all(); // Executa a query no banco
+                    return this.db.query(builderResult).all(); // Executa a query no banco
+                }
 
-    queryBuilderMethods.forEach(method => {
-        manager[method] = (...args: any[]) => {
-            // Executa o método no builder
-            const builderResult = (builder as any)[method](...args);
-            // Se o método for 'run', executa a query no banco de dados
-            // console.log({ method })
-            if (method.toUpperCase().includes('TABLE')) {
-                // console.log('Rodou aqui! table')
-                // console.log({ builderResult: builderResult.run() })
-                // builder.actualQuery = []
-                db.exec(builderResult.run()); // Executa a query no banco
-                builder.queryBrute = undefined
-                return;
-            }
-            if (method === 'run') {
-                // console.log('Rodou aqui! run')
-                const query = builder.run(); // Obter a query final
-                // console.log('Executing query:', {query, builderResult});
-                return db.query(builderResult).all(); // Executa a query no banco
-            }
-
-            return manager; // Retorna o manager para permitir encadeamento
-        };
-    });
-
-    return manager;
+                return this; // Retorna o manager para permitir encadeamento
+            };
+        });
+    }
 }

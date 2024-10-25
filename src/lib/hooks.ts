@@ -1,13 +1,15 @@
 import type { QueryPart } from "./query-builder";
 
-type Hook = (queryPart: QueryPart) => QueryPart | void;
+type Action = (queryPart: QueryPart[]) => QueryPart[] | void;
+type TableName = string;
+type Hook = Record<TableName, Action>;
 
 export interface Hooks {
-    beforeSelect?: Hook[];
-    afterSelect?: Hook[];
-    beforeInsert?: Hook[];
-    afterInsert?: Hook[];
-    beforeUpdate?: Hook[];
-    afterUpdate?: Hook[];
+    beforeSelect: Hook[];
+    afterSelect: Hook[];
+    beforeInsert: Hook[];
+    afterInsert: Hook[];
+    beforeUpdate: Hook[];
+    afterUpdate: Hook[];
     // Outros hooks...
 }
