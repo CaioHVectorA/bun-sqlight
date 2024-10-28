@@ -3,8 +3,8 @@
 - [X] Add a querybuilder interface to transform an API to query strings
 - [ ] Add a schema builder and CLI
     - [X] Add a schema interface with callback
-    - [ ] Add hooks to automatically set some columns like (id, created_at, updated_at, uuid)
-        - [ ] UUID
+    - [W] Add hooks to automatically set some columns like (id, created_at, updated_at, uuid)
+        - [X] UUID
         - [ ] Created_at
         - [ ] Updated_at
     - [ ] Add, refine and test the API for the schema builder
