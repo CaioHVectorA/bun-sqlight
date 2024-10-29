@@ -26,7 +26,6 @@ export class DatabaseManager {
                 // Executa o método no builder
                 const builderResult = (this.builder as any)[method](...args);
                 if (method == 'insert') {
-                    console.log('Insert!', builderResult.actualQuery)
                     const callbacks = this.hooks.beforeInsert.filter(action => {
                         return !!(action[args[0]])
                     }).map(action => action[args[0]]);
@@ -34,6 +33,14 @@ export class DatabaseManager {
                         const resQuery = callback((builderResult as QueryBuilder).actualQuery)
                     })
                     // this.hooks.beforeInsert.forEach(hook => hook[this.builder.actualQuery[1].query](builderResult));
+                }
+                if (method == 'update') {
+                    const callbacks = this.hooks.beforeUpdate.filter(action => {
+                        return !!(action[args[0]])
+                    }).map(action => action[args[0]]);
+                    callbacks.forEach(callback => {
+                        const resQuery = callback((builderResult as QueryBuilder).actualQuery)
+                    })
                 }
                 if (method.toUpperCase().includes('TABLE')) {
                     this.db.exec(builderResult.run()); // Executa a query no banco
@@ -43,6 +50,7 @@ export class DatabaseManager {
                 if (method === 'run') {
                     const query = this.builder.run(); // Obter a query final
                     // return this.db.query(builderResult).all(); // Executa a query no banco
+                    console.log(`Running query: \n ${(builderResult ?? query)}`);
                     return this.db.query(builderResult).all(); // Executa a query no banco
                 }
 

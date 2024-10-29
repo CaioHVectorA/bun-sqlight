@@ -55,29 +55,54 @@ export class Schema implements TableSchemaHandles {
     }
     uuid(name = 'id') {
         if (!this.queryBuilder.db) return
-        this.queryBuilder.db.hooks.beforeInsert.push({ [this.table]: (q) => {
-            // "INSERT INTO users (name, age) VALUES (\"John Doe\", 18)" => "INSERT INTO users (id, name, age) VALUES (uuid(), \"John Doe\", 18)"
-            const insertIndex = q.findIndex(part => part.query.startsWith('INSERT INTO'))
-            const insertQuery = q[insertIndex].query
-            const insertQueryParts = insertQuery.split(' ')
-            const table = insertQueryParts[2]
-            const fields = []
-            const firstField = insertQueryParts.findIndex(parts => parts.includes('('))
-            const lastField = insertQueryParts.findIndex(parts => parts.includes(')'))
-            for (let i = firstField; i < lastField + 1; i++) {
-                fields.push(insertQueryParts[i].replace(',', '').replace(')', '').replace('(', ''))
+        this.queryBuilder.db.hooks.beforeInsert.push({
+            [this.table]: (q) => {
+                // "INSERT INTO users (name, age) VALUES (\"John Doe\", 18)" => "INSERT INTO users (id, name, age) VALUES (uuid(), \"John Doe\", 18)"
+                const insertIndex = q.findIndex(part => part.query.startsWith('INSERT INTO'))
+                const insertQuery = q[insertIndex].query
+                const insertQueryParts = insertQuery.split(' ')
+                const table = insertQueryParts[2]
+                const fields = []
+                const firstField = insertQueryParts.findIndex(parts => parts.includes('('))
+                const lastField = insertQueryParts.findIndex(parts => parts.includes(')'))
+                for (let i = firstField; i < lastField + 1; i++) {
+                    fields.push(insertQueryParts[i].replace(',', '').replace(')', '').replace('(', ''))
+                }
+                const values = q[insertIndex].query.split('VALUES')[1].split('(')[1].split(')')[0].split(',').map(value => value.trim())
+                fields.push(name)
+                values.push(`"${crypto.randomUUID()}"`)
+                q[insertIndex].query = `INSERT INTO ${table} (${fields.join(', ')}) VALUES (${values.join(', ')})`
             }
-            const values = q[insertIndex].query.split('VALUES')[1].split('(')[1].split(')')[0].split(',').map(value => value.trim())
-            fields.push(name)
-            values.push(`"${crypto.randomUUID()}"`)        
-            q[insertIndex].query = `INSERT INTO ${table} (${fields.join(', ')}) VALUES (${values.join(', ')})`
-            console.log({q})
-        } })
+        })
         this.queryBuilder.actualQuery.push({ query: `${name} UUID PRIMARY KEY`, level: QueryLevel.TABLE })
     }
     timestamps(): void {
         this.queryBuilder.actualQuery.push({ query: `created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, level: QueryLevel.TABLE })
         this.queryBuilder.actualQuery.push({ query: `updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, level: QueryLevel.TABLE })
+        if (!this.queryBuilder.db) return
+        // with using hooks.afterUpdate hook, we should update updated_at field with current timestamp
+        this.queryBuilder.db.hooks.beforeUpdate.push({
+            [this.table]: (q) => {
+                // Find the index of the UPDATE query
+                const updateIndex = q.findIndex(part => part.query.startsWith('UPDATE'))
+                const updateQuery = q[updateIndex].query
+
+                // Find the index of the WHERE query
+                const whereIndex = q.findIndex(part => part.query.startsWith('WHERE'))
+                const whereQuery = q[whereIndex].query
+
+                // Extract the SET clause from the UPDATE query
+                const setClause = updateQuery.split('SET')[1].trim()
+                // Add updated_at field to the SET clause
+                const updatedSetClause = `${setClause}, updated_at = CURRENT_TIMESTAMP`
+                console.log({ setClause, updatedSetClause })
+                const newUpdateQuery = `UPDATE ${this.table} SET ${updatedSetClause} ${whereQuery}`.replaceAll(`"`, `'`)
+                console.log({ newUpdateQuery })
+                // Reconstruct the UPDATE query with the updated SET clause
+                q[updateIndex].query = newUpdateQuery
+                q[whereIndex].query = ''
+            }
+        })
     }
     foreign(name: string, reference: `${string}.${string}`) {
         this.queryBuilder.actualQuery.push({ query: `${name} INTEGER REFERENCES ${reference}`, level: QueryLevel.TABLE })
@@ -89,7 +114,7 @@ export function createSchemaCallback(table: string, callback: (schema: Schema) =
     qb.db = queryBuilder.db
     const schema = new Schema(table, qb)
     callback(schema)
-    const commands =  schema.queryBuilder.actualQuery
+    const commands = schema.queryBuilder.actualQuery
     let query = `CREATE TABLE ${table} (${commands.map(command => command.query).join(', ')})`
     // remove more of one space on query to one space
     query = query.replace(/\s{2,}/g, ' ')
