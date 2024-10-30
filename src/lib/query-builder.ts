@@ -114,20 +114,20 @@ export class QueryBuilder implements IQueryBuilder {
         return queryWithAnd.join(' ')
     }
 }
-const qb = new QueryBuilder()
-const db = new DatabaseManager(qb, new Database('f.db')) as unknown as QueryBuilder
-db.createTable('users', table => {
-    table.uuid(),
-        table.string('name'),
-        table.integer('age'),
-        table.timestamps()
-})
-Array.from({ length: 10 }).forEach((_, index) => {
-    db.insert('users', { name: `John Doe ${index}`, age: 18 + index }).run()
-})
-const rows = (db.select('*').from('users').run()) as unknown as { name: string, age: number, id: string }[]
-for (const row of rows) {
-    db.where('id', row.id).update('users', { name: `Jane ${Math.floor(Math.random() * 100)}` }).run()
-    await Bun.sleep(2000)
-    console.log((db.select('*').from('users').where('id', row.id).run()) as unknown as { name: string, age: number, id: string }[])
-}
+// const qb = new QueryBuilder()
+// const db = new DatabaseManager(qb, new Database('f.db')) as unknown as QueryBuilder
+// db.createTable('users', table => {
+//     table.uuid(),
+//         table.string('name'),
+//         table.integer('age'),
+//         table.timestamps()
+// })
+// Array.from({ length: 10 }).forEach((_, index) => {
+//     db.insert('users', { name: `John Doe ${index}`, age: 18 + index }).run()
+// })
+// const rows = (db.select('*').from('users').run()) as unknown as { name: string, age: number, id: string }[]
+// for (const row of rows) {
+//     db.where('id', row.id).update('users', { name: `Jane ${Math.floor(Math.random() * 100)}` }).run()
+//     await Bun.sleep(2000)
+//     console.log((db.select('*').from('users').where('id', row.id).run()) as unknown as { name: string, age: number, id: string }[])
+// }

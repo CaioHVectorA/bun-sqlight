@@ -5,8 +5,8 @@
     - [X] Add a schema interface with callback
     - [W] Add hooks to automatically set some columns like (id, created_at, updated_at, uuid)
         - [X] UUID
-        - [ ] Created_at
-        - [ ] Updated_at
+        - [X] Created_at
+        - [X] Updated_at
     - [ ] Add, refine and test the API for the schema builder
     - [ ] Add a CLI to generate the schema
     - [ ] Setup a migration architecture

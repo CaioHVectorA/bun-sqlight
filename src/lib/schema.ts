@@ -1,10 +1,10 @@
 import { QueryBuilder, QueryLevel, type IQueryBuilder } from "./query-builder"
 
-type Options<T> = {
+type Options<T> = Partial<{
     default: T,
     unique: boolean,
     nullable: boolean
-}
+}>
 interface TableSchemaHandles {
     queryBuilder: IQueryBuilder
     table: string
