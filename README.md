@@ -35,11 +35,11 @@ The bun-sqlight improves a good migration system to manage the database schema.
 
 ```ts
 // migrations/create-users-table.ts
-db.createTable('users', function (table) {
-    table.increments('id');
-    table.string('name');
-    table.string('email', { unique: true });
-    table.timestamps();
+db.createTable('users', (t) => {
+    t.increments('id');
+    t.string('name');
+    t.string('email', { unique: true });
+    t.timestamps();
 })
 
 // or 
