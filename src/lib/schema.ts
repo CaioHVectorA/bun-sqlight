@@ -8,6 +8,7 @@ type Options<T> = Partial<{
 interface TableSchemaHandles {
     queryBuilder: IQueryBuilder
     table: string
+    mainQuerybuilder: IQueryBuilder
     id(name?: string): void
     string(name: string, options: Options<string>): void
     integer(name: string, options: Options<number>): void
@@ -21,37 +22,45 @@ interface TableSchemaHandles {
 export class Schema implements TableSchemaHandles {
     queryBuilder: IQueryBuilder
     table: string
-    constructor(table: string, queryBuilder: IQueryBuilder) {
+    mainQuerybuilder: IQueryBuilder
+    constructor(table: string, queryBuilder: IQueryBuilder, mainQuerybuilder: IQueryBuilder) {
         this.queryBuilder = queryBuilder
         this.table = table
+        this.mainQuerybuilder = mainQuerybuilder
+        this.mainQuerybuilder.tables[table] = {}
         // this.queryBuilder.actualQuery.push({ query: `CREATE TABLE ${table}`, level: QueryLevel.TABLE })
     }
     id(name = 'id') {
         this.queryBuilder.actualQuery.push({ query: `${name} INTEGER PRIMARY KEY AUTOINCREMENT`, level: QueryLevel.TABLE })
+        this.mainQuerybuilder.tables[this.table][name] = 'INTEGER'
     }
     string(name: string, options?: Options<string>) {
         const defaultText = options?.default ? `DEFAULT '${options.default}'` : ''
         const uniqueText = options?.unique ? 'UNIQUE' : ''
         const nullableText = options?.nullable ? 'NULL' : 'NOT NULL'
         this.queryBuilder.actualQuery.push({ query: `${name} TEXT ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE })
+        this.mainQuerybuilder.tables[this.table][name] = 'TEXT'
     }
     integer(name: string, options?: Options<number>) {
         const defaultText = options?.default ? `DEFAULT ${options.default}` : ''
         const uniqueText = options?.unique ? 'UNIQUE' : ''
         const nullableText = options?.nullable ? 'NULL' : 'NOT NULL'
         this.queryBuilder.actualQuery.push({ query: `${name} INTEGER ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE })
+        this.mainQuerybuilder.tables[this.table][name] = 'INTEGER'
     }
     boolean(name: string, options?: Options<boolean>) {
         const defaultText = options?.default ? `DEFAULT ${options.default}` : ''
         const uniqueText = options?.unique ? 'UNIQUE' : ''
         const nullableText = options?.nullable ? 'NULL' : 'NOT NULL'
         this.queryBuilder.actualQuery.push({ query: `${name} BOOLEAN ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE })
+        this.mainQuerybuilder.tables[this.table][name] = 'BOOLEAN'
     }
     float(name: string, options?: Options<number>) {
         const defaultText = options?.default ? `DEFAULT ${options.default}` : ''
         const uniqueText = options?.unique ? 'UNIQUE' : ''
         const nullableText = options?.nullable ? 'NULL' : 'NOT NULL'
         this.queryBuilder.actualQuery.push({ query: `${name} REAL ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE })
+        this.mainQuerybuilder.tables[this.table][name] = 'REAL'
     }
     uuid(name = 'id') {
         if (!this.queryBuilder.db) return
@@ -75,6 +84,7 @@ export class Schema implements TableSchemaHandles {
             }
         })
         this.queryBuilder.actualQuery.push({ query: `${name} UUID PRIMARY KEY`, level: QueryLevel.TABLE })
+        this.mainQuerybuilder.tables[this.table][name] = 'UUID'
     }
     timestamps(): void {
         this.queryBuilder.actualQuery.push({ query: `created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, level: QueryLevel.TABLE })
@@ -103,16 +113,24 @@ export class Schema implements TableSchemaHandles {
                 q[whereIndex].query = ''
             }
         })
+        this.mainQuerybuilder.tables[this.table]['created_at'] = 'TIMESTAMP'
+        this.mainQuerybuilder.tables[this.table]['updated_at'] = 'TIMESTAMP'
     }
     foreign(name: string, reference: `${string}.${string}`) {
-        this.queryBuilder.actualQuery.push({ query: `${name} INTEGER REFERENCES ${reference}`, level: QueryLevel.TABLE })
+        const [table, column] = reference.split('.')
+        const schema = this.mainQuerybuilder.tables[table]
+        console.log({ table, column, tables: this.mainQuerybuilder.tables })
+        if (!schema) throw new Error('Table not found')
+        const type = schema[column]
+        console.log({ type })
+        this.queryBuilder.actualQuery.push({ query: `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${table}(${column}) ON DELETE CASCADE ON UPDATE CASCADE`, level: QueryLevel.TABLE })
     }
 }
 
 export function createSchemaCallback(table: string, callback: (schema: Schema) => void, queryBuilder: IQueryBuilder) {
     const qb = new QueryBuilder()
     qb.db = queryBuilder.db
-    const schema = new Schema(table, qb)
+    const schema = new Schema(table, qb, queryBuilder)
     callback(schema)
     const commands = schema.queryBuilder.actualQuery
     let query = `CREATE TABLE ${table} (${commands.map(command => command.query).join(', ')})`

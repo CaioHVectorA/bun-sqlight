@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite'
 import { DatabaseManager } from './db-manager'
 import type { Hooks } from "./hooks"
 import { createSchemaCallback, Schema } from "./schema"
+import type { Tables } from './table'
 
 export enum QueryLevel {
     CLAUSE = 1,
@@ -18,6 +19,7 @@ interface SchemaOptions {
 }
 export interface IQueryBuilder {
     queryBrute?: string
+    tables: Tables
     db?: DatabaseManager
     actualQuery: QueryPart[]
     select(fields: string | string[]): this
@@ -34,6 +36,7 @@ export interface IQueryBuilder {
 }
 
 export class QueryBuilder implements IQueryBuilder {
+    tables: Tables = {}
     queryBrute?: string
     db?: DatabaseManager
     actualQuery: QueryPart[] = []
@@ -99,7 +102,11 @@ export class QueryBuilder implements IQueryBuilder {
         return this
     }
     run(): string {
-        if (this.queryBrute) return this.queryBrute
+        if (this.queryBrute) {
+            const temp = this.queryBrute
+            this.queryBrute = undefined
+            return temp
+        }
         const sorted = this.actualQuery.sort((a, b) => a.level - b.level)
         // add AND clause logic
         const queryWithAnd = sorted.map((part, index) => {

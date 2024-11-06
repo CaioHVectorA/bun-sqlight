@@ -6,7 +6,6 @@ describe("Tables and schema", () => {
         const queryExpected = 'CREATE TABLE users (id INT, name VARCHAR(255))'
         const query = querybuilder.createTable('users', { id: 'INT', name: 'VARCHAR(255)' })
         const queryRun = query.run()
-        console.log(queryRun)
         expect(queryRun).toBe(queryExpected)
     })
     test('Should be able to drop a table', () => {
@@ -29,7 +28,6 @@ describe("Tables and schema", () => {
             table.id()
             table.string('name', { default: 'John Doe' })
         })
-        console.log(query.run())
         expect(query.run()).toBe(queryExpected)
         const nullableQuery = querybuilder.createTable('users', (table) => {
             table.id()
