@@ -116,14 +116,16 @@ export class Schema implements TableSchemaHandles {
         this.mainQuerybuilder.tables[this.table]['created_at'] = 'TIMESTAMP'
         this.mainQuerybuilder.tables[this.table]['updated_at'] = 'TIMESTAMP'
     }
-    foreign(name: string, reference: `${string}.${string}`) {
+    foreign(name: string, reference: `${string}.${string}`, options?: Options<string> & { onDelete?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION', onUpdate?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION' }) {
         const [table, column] = reference.split('.')
         const schema = this.mainQuerybuilder.tables[table]
         console.log({ table, column, tables: this.mainQuerybuilder.tables })
         if (!schema) throw new Error('Table not found')
         const type = schema[column]
         console.log({ type })
-        this.queryBuilder.actualQuery.push({ query: `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${table}(${column}) ON DELETE CASCADE ON UPDATE CASCADE`, level: QueryLevel.TABLE })
+        const onDelete = options?.onDelete ? ` ON DELETE ${options.onDelete}` : ''
+        const onUpdate = options?.onUpdate ? ` ON UPDATE ${options.onUpdate}` : ''
+        this.queryBuilder.actualQuery.push({ query: `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${table}(${column})${onDelete}${onUpdate}`, level: QueryLevel.TABLE })
     }
 }
 
