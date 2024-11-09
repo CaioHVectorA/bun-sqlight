@@ -43,7 +43,9 @@ export class DatabaseManager {
                     })
                 }
                 if (method.toUpperCase().includes('TABLE')) {
-                    this.db.exec(builderResult.run()); // Executa a query no banco
+                    const query = builderResult.run(); // Obter a query final
+                    console.log(`Running query: \n ${(query)}`);
+                    this.db.exec(query); // Executa a query no banco
                     this.builder.queryBrute = undefined;
                     return;
                 }
@@ -57,5 +59,8 @@ export class DatabaseManager {
                 return this; // Retorna o manager para permitir encadeamento
             };
         });
+    }
+    static getDb(db: string) {
+        return new Database(db);
     }
 }

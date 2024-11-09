@@ -124,7 +124,8 @@ export class QueryBuilder implements IQueryBuilder {
     // join()
     join(target: `${string}.${string}`, reference: `${string}.${string}`, options: {
         type?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL',
-        comparison?: '=' | '!=' | '>' | '<' | '>=' | '<='
+        comparison?: '=' | '!=' | '>' | '<' | '>=' | '<=',
+        alias?: [string, string]
     } = { comparison: '=', type: 'INNER' }): this {
         // SELECT * FROM users JOIN products ON users.id = products.user_id
         const comparison = options.comparison ?? '='
@@ -133,6 +134,7 @@ export class QueryBuilder implements IQueryBuilder {
         const [table1, column1] = reference.split('.')
         // if user use target as same table from the select, then we should swap the tables
         const select = this.actualQuery.find(part => part.query.includes('FROM'))
+        // IMPLEMENT ALIAS!
         if (select && select.query.includes(table2)) {
             this.actualQuery.push({ query: `${options.type} JOIN ${table1} ON ${table2}.${column2} ${options.comparison} ${table1}.${column1}`, level: QueryLevel.TABLE })
             return this
