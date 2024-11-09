@@ -105,9 +105,9 @@ export class Schema implements TableSchemaHandles {
                 const setClause = updateQuery.split('SET')[1].trim()
                 // Add updated_at field to the SET clause
                 const updatedSetClause = `${setClause}, updated_at = CURRENT_TIMESTAMP`
-                console.log({ setClause, updatedSetClause })
+                // console.log({ setClause, updatedSetClause })
                 const newUpdateQuery = `UPDATE ${this.table} SET ${updatedSetClause} ${whereQuery}`.replaceAll(`"`, `'`)
-                console.log({ newUpdateQuery })
+                // console.log({ newUpdateQuery })
                 // Reconstruct the UPDATE query with the updated SET clause
                 q[updateIndex].query = newUpdateQuery
                 q[whereIndex].query = ''
@@ -119,10 +119,10 @@ export class Schema implements TableSchemaHandles {
     foreign(name: string, reference: `${string}.${string}`, options?: Options<string> & { onDelete?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION', onUpdate?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION' }) {
         const [table, column] = reference.split('.')
         const schema = this.mainQuerybuilder.tables[table]
-        console.log({ table, column, tables: this.mainQuerybuilder.tables })
+        // console.log({ table, column, tables: this.mainQuerybuilder.tables })
         if (!schema) throw new Error('Table not found')
         const type = schema[column]
-        console.log({ type })
+        // console.log({ type })
         const onDelete = options?.onDelete ? ` ON DELETE ${options.onDelete}` : ''
         const onUpdate = options?.onUpdate ? ` ON UPDATE ${options.onUpdate}` : ''
         this.queryBuilder.actualQuery.push({ query: `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${table}(${column})${onDelete}${onUpdate}`, level: QueryLevel.TABLE })

@@ -22,7 +22,7 @@ export interface IQueryBuilder {
     tables: Tables
     db?: DatabaseManager
     actualQuery: QueryPart[]
-    select(fields: string | string[]): this
+    select(...fields: string[]): this
     from(table: string): this
     where(field: string, value: any): this
     orWhere(field: string, value: any): this
@@ -40,7 +40,7 @@ export class QueryBuilder implements IQueryBuilder {
     queryBrute?: string
     db?: DatabaseManager
     actualQuery: QueryPart[] = []
-    select(fields: string | string[]): this {
+    select(...fields: string[]): this {
         this.actualQuery.push({ query: `SELECT ${Array.isArray(fields) ? fields.join(', ') : fields}`, level: QueryLevel.CLAUSE })
         return this
     }
@@ -119,6 +119,26 @@ export class QueryBuilder implements IQueryBuilder {
         })
         this.actualQuery = []
         return queryWithAnd.join(' ')
+    }
+
+    // join()
+    join(target: `${string}.${string}`, reference: `${string}.${string}`, options: {
+        type?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL',
+        comparison?: '=' | '!=' | '>' | '<' | '>=' | '<='
+    } = { comparison: '=', type: 'INNER' }): this {
+        // SELECT * FROM users JOIN products ON users.id = products.user_id
+        const comparison = options.comparison ?? '='
+        const type = options.type ?? 'INNER'
+        const [table2, column2] = target.split('.')
+        const [table1, column1] = reference.split('.')
+        // if user use target as same table from the select, then we should swap the tables
+        const select = this.actualQuery.find(part => part.query.includes('FROM'))
+        if (select && select.query.includes(table2)) {
+            this.actualQuery.push({ query: `${options.type} JOIN ${table1} ON ${table2}.${column2} ${options.comparison} ${table1}.${column1}`, level: QueryLevel.TABLE })
+            return this
+        }
+        this.actualQuery.push({ query: `${type} JOIN ${table2} ON ${table1}.${column1} ${comparison} ${table2}.${column2}`, level: QueryLevel.TABLE })
+        return this
     }
 }
 // const qb = new QueryBuilder()
