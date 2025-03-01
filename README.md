@@ -17,16 +17,16 @@ const db = new BunSqlight('myDb.db');
 ### Usage
 
 ```ts
-db.from('users').select('name', 'email').where('id', 1).get();
+db.from('users').select('name', 'email').where('id', 1);
 // same result:
-db.select(['name', 'email']).from('users').where('id', 1).get();
-db.select('name', 'email').from('users').where('id', 1).get();
+db.select(['name', 'email']).from('users').where('id', 1);
+db.select('name', 'email').from('users').where('id', 1);
 
 
 // CRUD:
-db.from('users').insert({ name: 'John', email: 'john@gm.co'}).set()
-db.from('users').update({ name: 'John Doe', email: 'john2@gm.co'}).where('id', 1).set();
-db.from('users').delete().where('id', 1).remove();
+db.insert('users',{ name: 'John', email: 'john@gm.co'})
+db.update('users',{ name: 'John', email: 'john@gm.co'})
+db.delete('users').where('id', 1)
 ```
 
 ### Schema
