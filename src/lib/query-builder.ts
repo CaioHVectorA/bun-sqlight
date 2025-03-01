@@ -1,10 +1,18 @@
-import { Database } from "bun:sqlite";
-import { DatabaseManager } from "./db-manager";
-import type { Hooks } from "./hooks";
-import { createSchemaCallback, Schema } from "./schema";
-import type { Tables } from "./table";
-import { invertObject } from "../utils/invert-obj";
-
+import { Database } from 'bun:sqlite';
+import { sql } from 'bun';
+import { DatabaseManager } from './db-manager';
+import type { Hooks } from './hooks';
+import { createSchemaCallback, Schema } from './schema';
+import type { Tables } from './table';
+import { invertObject } from '../utils/invert-obj';
+export enum Comparison {
+  EQUAL = '=',
+  NOT_EQUAL = '!=',
+  GREATER_THAN = '>',
+  LESS_THAN = '<',
+  GREATER_THAN_OR_EQUAL = '>=',
+  LESS_THAN_OR_EQUAL = '<=',
+}
 export enum QueryLevel {
   CLAUSE = 1,
   TABLE = 2,
@@ -27,12 +35,12 @@ export interface IQueryBuilder {
   from(table: string): this;
   where(field: string, value: any): this;
   orWhere(field: string, value: any): this;
-  orderBy(field: string, direction: "ASC" | "DESC"): this;
+  orderBy(field: string, direction: 'ASC' | 'DESC'): this;
   limit(limit: number): this;
   dropTable(table: string): this;
   createTable(table: string, fields: { [key: string]: string }): this;
-  insert(table: string, data: { [key: string]: any }): this;
-  update(table: string, data: { [key: string]: any }): this;
+  insert(table: string, data: Record<string, any>): this;
+  update(table: string, data: Record<string, any>): this;
   run(): string;
 }
 
@@ -43,7 +51,7 @@ export class QueryBuilder implements IQueryBuilder {
   actualQuery: QueryPart[] = [];
   select(...fields: string[]): this {
     this.actualQuery.push({
-      query: `SELECT ${Array.isArray(fields) ? fields.join(", ") : fields}`,
+      query: `SELECT ${Array.isArray(fields) ? fields.join(', ') : fields}`,
       level: QueryLevel.CLAUSE,
     });
     return this;
@@ -52,33 +60,50 @@ export class QueryBuilder implements IQueryBuilder {
     this.actualQuery.push({ query: `FROM ${table}`, level: QueryLevel.TABLE });
     return this;
   }
-  where(field: string, value: any): this {
-    if (this.actualQuery.find((part) => part.query.includes("WHERE"))) {
+  // into(table: string): this {
+  //   this.actualQuery.push({ query: `INTO ${table}`, level: QueryLevel.TABLE });
+  //   return this;
+  // }
+  where(field: string, valueOrComparison: any, value?: any): this {
+    let comparison = Comparison.EQUAL;
+    let valueToUse = valueOrComparison;
+
+    if (value !== undefined) {
+      comparison = valueOrComparison as Comparison;
+      valueToUse = value;
+    }
+
+    if (this.actualQuery.find((part) => part.query.includes('WHERE'))) {
       this.actualQuery.push({
-        query: `${field} = ${typeof value === "string" ? `"${value}"` : value}`,
+        query: `${field} ${comparison} ${typeof valueToUse === 'string' ? `"${valueToUse}"` : valueToUse}`,
         level: QueryLevel.WHERE,
       });
       return this;
     }
+
     this.actualQuery.push({
-      query: `WHERE ${field} = ${
-        typeof value === "string" ? `"${value}"` : value
-      }`,
+      query: `WHERE ${field} ${comparison} ${typeof valueToUse === 'string' ? `"${valueToUse}"` : valueToUse}`,
       level: QueryLevel.WHERE,
     });
     return this;
   }
-  orWhere(field: string, value: any): this {
+  orWhere(field: string, valueOrComparison: any, value?: any): this {
+    let comparison = Comparison.EQUAL;
+    let valueToUse = valueOrComparison;
+
+    if (value !== undefined) {
+      comparison = valueOrComparison as Comparison;
+      valueToUse = value;
+    }
+
     this.actualQuery.push({
-      query: `OR ${field} = ${
-        typeof value === "string" ? `"${value}"` : value
-      }`,
+      query: `OR ${field} ${comparison} ${typeof valueToUse === 'string' ? `"${valueToUse}"` : valueToUse}`,
       level: QueryLevel.WHERE,
     });
     return this;
   }
-  orderBy(field: string, direction: "ASC" | "DESC"): this {
-    if (this.actualQuery.find((part) => part.query.includes("ORDER BY"))) {
+  orderBy(field: string, direction: 'ASC' | 'DESC'): this {
+    if (this.actualQuery.find((part) => part.query.includes('ORDER BY'))) {
       this.actualQuery.push({
         query: `, ${field} ${direction}`,
         level: QueryLevel.ORDER_LIMIT,
@@ -110,38 +135,33 @@ export class QueryBuilder implements IQueryBuilder {
     fields: { [key: string]: string } | ((schema: Schema) => void),
     options: SchemaOptions = { exists: true }
   ): this {
-    if (typeof fields === "function") {
+    if (typeof fields === 'function') {
       createSchemaCallback(table, fields, this);
       return this;
     }
     this.actualQuery.push({
       query: `CREATE TABLE ${table} (${Object.entries(fields)
         .map(([key, value]) => `${key} ${value}`)
-        .join(", ")})`,
+        .join(', ')})`,
       level: QueryLevel.TABLE,
     });
     return this;
     // SELECT * FROM users
   }
-  insert(table: string, data: { [key: string]: any }): this {
+  insert(table: string, data: Record<string, any>): this {
     this.actualQuery.push({
-      query: `INSERT INTO ${table} (${Object.keys(data).join(
-        ", "
-      )}) VALUES (${Object.values(data)
-        .map((value) => (typeof value === "string" ? `"${value}"` : value))
-        .join(", ")})`,
+      query: `INSERT INTO ${table} (${Object.keys(data).join(', ')}) VALUES (${Object.values(data)
+        .map((value) => (typeof value === 'string' ? `"${value}"` : value))
+        .join(', ')})`,
       level: QueryLevel.CLAUSE,
     });
     return this;
   }
-  update(table: string, data: { [key: string]: any }): this {
+  update(table: string, data: Record<string, any>): this {
     this.actualQuery.push({
       query: `UPDATE ${table} SET ${Object.entries(data)
-        .map(
-          ([key, value]) =>
-            `${key} = ${typeof value === "string" ? `"${value}"` : value}`
-        )
-        .join(", ")}`,
+        .map(([key, value]) => `${key} = ${typeof value === 'string' ? `"${value}"` : value}`)
+        .join(', ')}`,
       level: QueryLevel.CLAUSE,
     });
     return this;
@@ -171,17 +191,13 @@ export class QueryBuilder implements IQueryBuilder {
     const queryWithAnd = sorted.map((part, index) => {
       if (index === 0) return part.query;
       const nextPart = sorted[index + 1];
-      if (
-        part.level === QueryLevel.WHERE &&
-        sorted[index - 1].level === QueryLevel.WHERE &&
-        !part.query.startsWith("OR")
-      ) {
+      if (part.level === QueryLevel.WHERE && sorted[index - 1].level === QueryLevel.WHERE && !part.query.startsWith('OR')) {
         return `AND ${part.query}`;
       }
       return part.query;
     });
     this.actualQuery = [];
-    return queryWithAnd.join(" ");
+    return queryWithAnd.join(' ');
   }
 
   // join()
@@ -189,72 +205,59 @@ export class QueryBuilder implements IQueryBuilder {
     target: `${string}.${string}`,
     reference: `${string}.${string}`,
     options: {
-      type?: "INNER" | "LEFT" | "RIGHT" | "FULL";
-      comparison?: "=" | "!=" | ">" | "<" | ">=" | "<=";
+      type?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+      comparison?: Comparison | '!=' | '>' | '<' | '>=' | '<=' | '=';
       alias?: Record<string, string>;
-    } = { comparison: "=", type: "INNER" }
+    } = { comparison: '=', type: 'INNER' }
   ): this {
     const findAlias = (table: string, fallback: string) => {
-      return (options.alias || {})[table] || fallback || "";
+      return (options.alias || {})[table] || fallback || '';
     };
     const findRef = (ref: string, fallback: string) => {
-      return invertObject(options.alias || {})[ref] || fallback || "";
+      return invertObject(options.alias || {})[ref] || fallback || '';
     };
     // SELECT * FROM users JOIN products ON users.id = products.user_id
-    const comparison = options.comparison ?? "=";
-    const type = options.type ?? "INNER";
+    const comparison = options.comparison ?? '=';
+    const type = options.type ?? 'INNER';
     console.log(this.actualQuery);
-    let [table2, column2] = target.split(".");
-    let [table1, column1] = reference.split(".");
+    let [table2, column2] = target.split('.');
+    let [table1, column1] = reference.split('.');
     table2 = findRef(table2, table2);
     table1 = findRef(table1, table1);
     // if user use target as same table from the select, then we should swap the tables
-    const select = this.actualQuery.find((part) => part.query.includes("FROM"));
+    const select = this.actualQuery.find((part) => part.query.includes('FROM'));
     const aliasesValues = Object.values(options.alias || {}); // "[P, U]"
-    const alias1 = aliasesValues[1] ? aliasesValues[1] : "";
-    const alias2 = aliasesValues[0] ? aliasesValues[0] : "";
+    const alias1 = aliasesValues[1] ? aliasesValues[1] : '';
+    const alias2 = aliasesValues[0] ? aliasesValues[0] : '';
 
     if (select && select.query.includes(table2)) {
       this.actualQuery.push({
-        query: `${type} JOIN ${table1}${` ${findAlias(
-          table1,
-          alias1
-        )}`} ON ${findAlias(
+        query: `${type} JOIN ${table1}${` ${findAlias(table1, alias1)}`} ON ${findAlias(
           table2,
           table2
         )}.${column2} ${comparison} ${findAlias(table1, table1)}.${column1}`,
         level: QueryLevel.TABLE,
       });
       // add alias to the select initial table
-      console.log("REACHED HERE!");
-      const withFrom = this.actualQuery.findIndex(
-        (s) => s.query.includes("FROM") && s.query.includes(table2)
-      );
-      if (!withFrom) throw new Error("Alias erroring");
-      this.actualQuery[withFrom].query =
-        this.actualQuery[withFrom].query + findAlias(table2, alias2);
+      console.log('REACHED HERE!');
+      const withFrom = this.actualQuery.findIndex((s) => s.query.includes('FROM') && s.query.includes(table2));
+      if (!withFrom) throw new Error('Alias erroring');
+      this.actualQuery[withFrom].query = this.actualQuery[withFrom].query + findAlias(table2, alias2);
       return this;
     }
 
     this.actualQuery.push({
-      query: `${type} JOIN ${table2}${` ${findAlias(
-        table2,
-        alias2
-      )}`} ON ${findAlias(table1, table1)}.${column1} ${comparison} ${findAlias(
+      query: `${type} JOIN ${table2}${` ${findAlias(table2, alias2)}`} ON ${findAlias(table1, table1)}.${column1} ${comparison} ${findAlias(
         table2,
         table2
       )}.${column2}`,
       level: QueryLevel.TABLE,
     });
-    console.log("REACHED HERE!");
-    const withFrom = this.actualQuery.findIndex(
-      (s) =>
-        s.query.includes("FROM") && s.query.includes(findRef(table1, table1))
-    );
-    if (!withFrom) throw new Error("Alias erroring");
+    console.log('REACHED HERE!');
+    const withFrom = this.actualQuery.findIndex((s) => s.query.includes('FROM') && s.query.includes(findRef(table1, table1)));
+    if (!withFrom) throw new Error('Alias erroring');
     console.log({ table1, alias1, table2, alias2 });
-    this.actualQuery[withFrom].query =
-      this.actualQuery[withFrom].query + " " + findAlias(table1, alias1);
+    this.actualQuery[withFrom].query = this.actualQuery[withFrom].query + ' ' + findAlias(table1, alias1);
     return this;
   }
 }
