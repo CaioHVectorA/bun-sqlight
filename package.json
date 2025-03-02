@@ -2,6 +2,9 @@
   "name": "bun-sqligth",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "build": "bun build --target=bun --outfile=dist/out.js src/lib/db-manager.ts --minify"
+  },
   "devDependencies": {
     "@types/bun": "^1.2.4"
   },
