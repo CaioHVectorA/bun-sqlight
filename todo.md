@@ -7,7 +7,7 @@
     - [x] UUID
     - [x] Created_at
     - [x] Updated_at
-  - [ ] Add table schema in querybuildr ion each table created to work with foreign keys with INFERED types and something like that
+  - [X] Add table schema in querybuilder in each table created to work with foreign keys with INFERED types and something like that
   - [X] Add alias!
   - [ ] Add, refine and test the API for the schema builder
   - [ ] Add a CLI to generate the schema
