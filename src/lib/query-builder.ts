@@ -5,6 +5,7 @@ import type { Hooks } from './hooks';
 import { createSchemaCallback, Schema } from './schema';
 import type { Tables } from './table';
 import { invertObject } from '../utils/invert-obj';
+import { normalizeInsertData } from './normalize-insert-data';
 export enum Comparison {
   EQUAL = '=',
   NOT_EQUAL = '!=',
@@ -149,10 +150,10 @@ export class QueryBuilder implements IQueryBuilder {
     // SELECT * FROM users
   }
   insert(table: string, data: Record<string, any>): this {
+    const keys = Object.keys(data);
+    const values = Object.values(data);
     this.actualQuery.push({
-      query: `INSERT INTO ${table} (${Object.keys(data).join(', ')}) VALUES (${Object.values(data)
-        .map((value) => (typeof value === 'string' ? `"${value}"` : value))
-        .join(', ')})`,
+      query: `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${values.map(normalizeInsertData(this.tables, table, keys)).join(', ')})`,
       level: QueryLevel.CLAUSE,
     });
     return this;
