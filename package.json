@@ -6,6 +6,7 @@
     "build": "bun build --target=bun --outfile=dist/out.js src/lib/db-manager.ts --minify"
   },
   "devDependencies": {
+    "@faker-js/faker": "^9.5.1",
     "@types/bun": "^1.2.4"
   },
   "peerDependencies": {
