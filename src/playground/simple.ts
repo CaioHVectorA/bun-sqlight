@@ -2,9 +2,13 @@ import { Database } from '../lib/connect';
 import type { QueryBuilder } from '../lib/query-builder';
 import { MetricTimer } from '../utils/metric-timer';
 import { complexUserTable, mock, userTable } from './tables';
+import { rmSync } from 'fs';
+const DB_NAME = 'playground.db';
+const DIR = __dirname + `./${DB_NAME}`;
+rmSync(DIR, { recursive: true, force: true });
 const mt = new MetricTimer('100k inserts');
-const db = new Database('playground.db') as QueryBuilder;
-const number = 100;
+const db = new Database(DIR) as QueryBuilder;
+const number = 10000;
 db.createTable('user', userTable);
 mt.reset(`${number / 1000}k inserts`);
 for (let i = 0; i < number; i++) {

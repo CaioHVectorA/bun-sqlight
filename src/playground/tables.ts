@@ -4,6 +4,7 @@ export const userTable = (table: Schema) => {
   table.string('name');
   table.integer('age');
   table.id();
+  table.timestamps();
   // table.uuid('uuid')
 };
 
