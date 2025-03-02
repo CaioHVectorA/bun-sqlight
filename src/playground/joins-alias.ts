@@ -1,10 +1,11 @@
 import { QueryBuilder } from '../lib/query-builder';
 import { Database } from '../lib/connect';
-import { productTable, userTable } from './tables';
+import { productTable, userTable } from './utils/tables';
+import { setupDb } from './utils/setup-db';
 // this example shows an relational database with a user and a product table
 // the product table has a foreign key to the user table
 
-const db = new Database('f.db') as QueryBuilder;
+const db = setupDb();
 db.createTable('user', userTable);
 db.createTable('product', productTable);
 

@@ -1,4 +1,4 @@
-import type { Schema } from '../lib/schema';
+import type { Schema } from '../../lib/schema';
 import { fakerPT_BR as faker } from '@faker-js/faker';
 export const userTable = (table: Schema) => {
   table.string('name');
@@ -13,6 +13,7 @@ export const productTable = (table: Schema) => {
   table.integer('price');
   table.string('name');
   table.id();
+  table.timestamps();
   // table.uuid('uuid')
 };
 
@@ -36,6 +37,7 @@ export const complexUserTable = (table: Schema) => {
   // table.timestamp('createdAt');
   // table.timestamp('updatedAt');
   table.id();
+  table.timestamps();
   // table.uuid('uuid')
 };
 
