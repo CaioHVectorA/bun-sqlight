@@ -2,6 +2,7 @@
 
 - [x] Add a querybuilder interface to transform an API to query strings
 - [ ] Add a schema builder and CLI
+  - [X] add date field !!!!!!!
   - [x] Add a schema interface with callback
   - [W] Add hooks to automatically set some columns like (id, created_at, updated_at, uuid)
     - [x] UUID
@@ -20,9 +21,13 @@
 - [ ] Add a query logging system
 - [ ] Add excepction approach
 
+
+## Hot fixes, bugs, refactor and improvements
+- [Case that all data can be optional or defaulted](https://github.com/CaioHVectorA/bun-sqlight/issues/15)
+- [Options and table fields config on a better API](https://github.com/CaioHVectorA/bun-sqlight/issues/16)
 ## DX
 
-- [] Add api layer erros, like using select, delete, update without from
+- [] Add api layer erros(LINT?), like using select, delete, update without from
 - [] Add api layer warnings, to prevent update or delete without where clause -> maybe the userr want to deactivate this config
 
 ## Docs
