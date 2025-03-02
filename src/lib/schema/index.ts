@@ -64,6 +64,20 @@ export class Schema implements TableSchemaHandles {
     this.queryBuilder.actualQuery.push({ query: `${name} REAL ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
     this.mainQuerybuilder.tables[this.table][name] = 'REAL';
   }
+  date(name: string, options?: Options<string>) {
+    const defaultText = options?.default ? `DEFAULT '${options.default}'` : '';
+    const uniqueText = options?.unique ? 'UNIQUE' : '';
+    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
+    this.queryBuilder.actualQuery.push({ query: `${name} DATE ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
+    this.mainQuerybuilder.tables[this.table][name] = 'DATE';
+  }
+  datetime(name: string, options?: Options<string>) {
+    const defaultText = options?.default ? `DEFAULT '${options.default}'` : '';
+    const uniqueText = options?.unique ? 'UNIQUE' : '';
+    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
+    this.queryBuilder.actualQuery.push({ query: `${name} DATETIME ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
+    this.mainQuerybuilder.tables[this.table][name] = 'DATETIME';
+  }
   uuid(name = 'id') {
     if (!this.queryBuilder.db) return;
     this.queryBuilder.db.hooks.beforeInsert.push({
@@ -161,32 +175,3 @@ export function createSchemaCallback(table: string, callback: (schema: Schema) =
   queryBuilder.queryBrute = query;
   // transpile commands to create table syntax
 }
-
-// createSchemaCallback('users', table => {
-//     table.id()
-//     table.string('name', { default: 'John Doe', unique: true, nullable: false })
-//     table.integer('age', { default: 18, unique: false, nullable: false })
-//     table.boolean('active', { default: false, unique: false, nullable: false })
-//     table.timestamps()
-//     table.uuid()
-// }, new QueryBuilder())
-
-// createSchemaCallback('users', table => {
-//     table.id()
-//     table.
-// })
-// expectate input:
-// db.createTable('users', table => {
-//     table.uuid('id'),
-//     table.string('name')
-//     table.integer('age')
-//     table.boolean('active')
-//     table.timestamps() // created_at, updated_at
-//     table.unique('id')
-//     // or
-//     table.primary('id')
-//     table.foreign('id').references('other_table.id')
-// })
-// expectate output:
-// CREATE TABLE users (
-//     id UUID,
