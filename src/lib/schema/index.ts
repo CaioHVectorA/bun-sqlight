@@ -1,3 +1,4 @@
+import type { SQLITE_TYPES } from '../../utils/sqlite.types';
 import { QueryBuilder, QueryLevel, type IQueryBuilder } from '../query-builder';
 
 type Options<T> = Partial<{
@@ -5,138 +6,20 @@ type Options<T> = Partial<{
   unique: boolean;
   nullable: boolean;
 }>;
+
 interface TableSchemaHandles {
   queryBuilder: IQueryBuilder;
   table: string;
   mainQuerybuilder: IQueryBuilder;
   id(name?: string): void;
-  string(name: string, options: Options<string>): void;
-  integer(name: string, options: Options<number>): void;
-  boolean(name: string, options: Options<boolean>): void;
-  float(name: string, options: Options<number>): void;
-  uuid(name?: string): void; // unique automatic, PK automatic, as id name default
+  string(name: string, options?: Options<string>): void;
+  integer(name: string, options?: Options<number>): void;
+  boolean(name: string, options?: Options<boolean>): void;
+  float(name: string, options?: Options<number>): void;
+  date(name: string, options?: Options<string>): void;
+  datetime(name: string, options?: Options<string>): void;
+  uuid(name?: string): void;
   timestamps(): void;
-  foreign(name: string, reference: `${string}.${string}`): void; // table.column
-}
-function orderCommands(a: { query: string; level: QueryLevel }, b: { query: string; level: QueryLevel }) {
-  return a.level - b.level;
-}
-export class Schema implements TableSchemaHandles {
-  queryBuilder: IQueryBuilder;
-  table: string;
-  mainQuerybuilder: IQueryBuilder;
-  constructor(table: string, queryBuilder: IQueryBuilder, mainQuerybuilder: IQueryBuilder) {
-    this.queryBuilder = queryBuilder;
-    this.table = table;
-    this.mainQuerybuilder = mainQuerybuilder;
-    this.mainQuerybuilder.tables[table] = {};
-    // this.queryBuilder.actualQuery.push({ query: `CREATE TABLE ${table}`, level: QueryLevel.TABLE })
-  }
-  id(name = 'id') {
-    this.queryBuilder.actualQuery.unshift({ query: `${name} INTEGER PRIMARY KEY AUTOINCREMENT`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'INTEGER';
-  }
-  string(name: string, options?: Options<string>) {
-    const defaultText = options?.default ? `DEFAULT '${options.default}'` : '';
-    const uniqueText = options?.unique ? 'UNIQUE' : '';
-    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
-    this.queryBuilder.actualQuery.push({ query: `${name} TEXT ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'TEXT';
-  }
-  integer(name: string, options?: Options<number>) {
-    const defaultText = options?.default ? `DEFAULT ${options.default}` : '';
-    const uniqueText = options?.unique ? 'UNIQUE' : '';
-    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
-    this.queryBuilder.actualQuery.push({ query: `${name} INTEGER ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'INTEGER';
-  }
-  boolean(name: string, options?: Options<boolean>) {
-    const defaultText = options?.default ? `DEFAULT ${options.default}` : '';
-    const uniqueText = options?.unique ? 'UNIQUE' : '';
-    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
-    this.queryBuilder.actualQuery.push({ query: `${name} BOOLEAN ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'BOOLEAN';
-  }
-  float(name: string, options?: Options<number>) {
-    const defaultText = options?.default ? `DEFAULT ${options.default}` : '';
-    const uniqueText = options?.unique ? 'UNIQUE' : '';
-    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
-    this.queryBuilder.actualQuery.push({ query: `${name} REAL ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'REAL';
-  }
-  date(name: string, options?: Options<string>) {
-    const defaultText = options?.default ? `DEFAULT '${options.default}'` : '';
-    const uniqueText = options?.unique ? 'UNIQUE' : '';
-    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
-    this.queryBuilder.actualQuery.push({ query: `${name} DATE ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'DATE';
-  }
-  datetime(name: string, options?: Options<string>) {
-    const defaultText = options?.default ? `DEFAULT '${options.default}'` : '';
-    const uniqueText = options?.unique ? 'UNIQUE' : '';
-    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
-    this.queryBuilder.actualQuery.push({ query: `${name} DATETIME ${defaultText} ${uniqueText} ${nullableText}`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'DATETIME';
-  }
-  uuid(name = 'id') {
-    if (!this.queryBuilder.db) return;
-    this.queryBuilder.db.hooks.beforeInsert.push({
-      [this.table]: (q) => {
-        // "INSERT INTO users (name, age) VALUES (\"John Doe\", 18)" => "INSERT INTO users (id, name, age) VALUES (uuid(), \"John Doe\", 18)"
-        const insertIndex = q.findIndex((part) => part.query.startsWith('INSERT INTO'));
-        const insertQuery = q[insertIndex].query;
-        const insertQueryParts = insertQuery.split(' ');
-        const table = insertQueryParts[2];
-        const fields = [];
-        const firstField = insertQueryParts.findIndex((parts) => parts.includes('('));
-        const lastField = insertQueryParts.findIndex((parts) => parts.includes(')'));
-        for (let i = firstField; i < lastField + 1; i++) {
-          fields.push(insertQueryParts[i].replace(',', '').replace(')', '').replace('(', ''));
-        }
-        const values = q[insertIndex].query
-          .split('VALUES')[1]
-          .split('(')[1]
-          .split(')')[0]
-          .split(',')
-          .map((value) => value.trim());
-        fields.push(name);
-        values.push(`"${crypto.randomUUID()}"`);
-        q[insertIndex].query = `INSERT INTO ${table} (${fields.join(', ')}) VALUES (${values.join(', ')})`;
-      },
-    });
-    this.queryBuilder.actualQuery.unshift({ query: `${name} UUID PRIMARY KEY`, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'UUID';
-  }
-  timestamps(): void {
-    this.queryBuilder.actualQuery.push({ query: `created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, level: QueryLevel.TABLE });
-    this.queryBuilder.actualQuery.push({ query: `updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, level: QueryLevel.TABLE });
-    if (!this.queryBuilder.db) return;
-    // with using hooks.afterUpdate hook, we should update updated_at field with current timestamp
-    this.queryBuilder.db.hooks.beforeUpdate.push({
-      [this.table]: (q) => {
-        // Find the index of the UPDATE query
-        const updateIndex = q.findIndex((part) => part.query.startsWith('UPDATE'));
-        const updateQuery = q[updateIndex].query;
-
-        // Find the index of the WHERE query
-        const whereIndex = q.findIndex((part) => part.query.startsWith('WHERE'));
-        const whereQuery = q[whereIndex].query;
-
-        // Extract the SET clause from the UPDATE query
-        const setClause = updateQuery.split('SET')[1].trim();
-        // Add updated_at field to the SET clause
-        const updatedSetClause = `${setClause}, updated_at = CURRENT_TIMESTAMP`;
-        // console.log({ setClause, updatedSetClause })
-        const newUpdateQuery = `UPDATE ${this.table} SET ${updatedSetClause} ${whereQuery}`.replaceAll(`"`, `'`);
-        // console.log({ newUpdateQuery })
-        // Reconstruct the UPDATE query with the updated SET clause
-        q[updateIndex].query = newUpdateQuery;
-        q[whereIndex].query = '';
-      },
-    });
-    this.mainQuerybuilder.tables[this.table]['created_at'] = 'TIMESTAMP';
-    this.mainQuerybuilder.tables[this.table]['updated_at'] = 'TIMESTAMP';
-  }
   foreign(
     name: string,
     reference: `${string}.${string}`,
@@ -144,19 +27,124 @@ export class Schema implements TableSchemaHandles {
       onDelete?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
       onUpdate?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
     }
-  ) {
-    const [table, column] = reference.split('.');
-    const schema = this.mainQuerybuilder.tables[table];
-    // console.log({ table, column, tables: this.mainQuerybuilder.tables })
+  ): void;
+}
+
+function orderCommands(a: { query: string; level: QueryLevel }, b: { query: string; level: QueryLevel }) {
+  return a.level - b.level;
+}
+
+export class Schema implements TableSchemaHandles {
+  queryBuilder: IQueryBuilder;
+  table: string;
+  mainQuerybuilder: IQueryBuilder;
+
+  constructor(table: string, queryBuilder: IQueryBuilder, mainQuerybuilder: IQueryBuilder) {
+    this.queryBuilder = queryBuilder;
+    this.table = table;
+    this.mainQuerybuilder = mainQuerybuilder;
+    this.mainQuerybuilder.tables[table] = {};
+  }
+
+  // Método auxiliar para reduzir a repetição na criação de colunas
+  private addColumn(name: string, type: SQLITE_TYPES, options?: Options<any>): void {
+    const defaultText =
+      options?.default !== undefined
+        ? `DEFAULT ${['TEXT', 'DATE', 'DATETIME'].includes(type) ? `'${options.default}'` : options.default}`
+        : '';
+    const uniqueText = options?.unique ? 'UNIQUE' : '';
+    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
+    const query = `${name} ${type} ${defaultText} ${uniqueText} ${nullableText}`.replace(/\s+/g, ' ').trim();
+    this.queryBuilder.actualQuery.push({ query, level: QueryLevel.TABLE });
+    this.mainQuerybuilder.tables[this.table][name] = type;
+  }
+
+  id(name = 'id'): void {
+    const query = `${name} INTEGER PRIMARY KEY AUTOINCREMENT`;
+    this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
+    this.mainQuerybuilder.tables[this.table][name] = 'INTEGER';
+  }
+
+  string(name: string, options?: Options<string>): void {
+    this.addColumn(name, 'TEXT', options);
+  }
+
+  integer(name: string, options?: Options<number>): void {
+    this.addColumn(name, 'INTEGER', options);
+  }
+
+  boolean(name: string, options?: Options<boolean>): void {
+    this.addColumn(name, 'BOOLEAN', options);
+  }
+
+  float(name: string, options?: Options<number>): void {
+    this.addColumn(name, 'REAL', options);
+  }
+
+  date(name: string, options?: Options<string>): void {
+    this.addColumn(name, 'DATE', options);
+  }
+
+  datetime(name: string, options?: Options<string>): void {
+    this.addColumn(name, 'DATETIME', options);
+  }
+
+  uuid(name = 'id'): void {
+    if (!this.queryBuilder.db) return;
+    this.queryBuilder.db.hooks.beforeInsert.push({
+      [this.table]: (queries) => {
+        const insertIndex = queries.findIndex((q) => q.query.startsWith('INSERT INTO'));
+        if (insertIndex === -1) return;
+        const insertQuery = queries[insertIndex].query;
+        const tableName = insertQuery.split(' ')[2];
+        const fieldsMatch = insertQuery.match(/\(([^)]+)\)/);
+        const valuesMatch = insertQuery.match(/VALUES\s*\(([^)]+)\)/i);
+        if (!fieldsMatch || !valuesMatch) return;
+        const fields = fieldsMatch[1].split(',').map((f) => f.trim());
+        const values = valuesMatch[1].split(',').map((v) => v.trim());
+        fields.push(name);
+        values.push(`"${crypto.randomUUID()}"`);
+        queries[insertIndex].query = `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (${values.join(', ')})`;
+      },
+    });
+    const query = `${name} UUID PRIMARY KEY`;
+    this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
+    this.mainQuerybuilder.tables[this.table][name] = 'UUID';
+  }
+
+  timestamps(): void {
+    this.addColumn('created_at', 'TIMESTAMP', { default: 'CURRENT_TIMESTAMP', nullable: false });
+    this.addColumn('updated_at', 'TIMESTAMP', { default: 'CURRENT_TIMESTAMP', nullable: false });
+    if (!this.queryBuilder.db) return;
+    this.queryBuilder.db.hooks.beforeUpdate.push({
+      [this.table]: (queries) => {
+        const updateIndex = queries.findIndex((q) => q.query.startsWith('UPDATE'));
+        const whereIndex = queries.findIndex((q) => q.query.startsWith('WHERE'));
+        if (updateIndex === -1 || whereIndex === -1) return;
+        const setClause = queries[updateIndex].query.split('SET')[1].trim();
+        const updatedSetClause = `${setClause}, updated_at = CURRENT_TIMESTAMP`;
+        queries[updateIndex].query = `UPDATE ${this.table} SET ${updatedSetClause} ${queries[whereIndex].query}`.replace(/"/g, `'`);
+        queries[whereIndex].query = '';
+      },
+    });
+  }
+
+  foreign(
+    name: string,
+    reference: `${string}.${string}`,
+    options?: Options<string> & {
+      onDelete?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
+      onUpdate?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
+    }
+  ): void {
+    const [refTable, refColumn] = reference.split('.');
+    const schema = this.mainQuerybuilder.tables[refTable];
     if (!schema) throw new Error('Table not found');
-    const type = schema[column];
-    // console.log({ type })
+    const type = schema[refColumn];
     const onDelete = options?.onDelete ? ` ON DELETE ${options.onDelete}` : '';
     const onUpdate = options?.onUpdate ? ` ON UPDATE ${options.onUpdate}` : '';
-    this.queryBuilder.actualQuery.push({
-      query: `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${table}(${column})${onDelete}${onUpdate}`,
-      level: QueryLevel.WHERE,
-    });
+    const query = `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${refTable}(${refColumn})${onDelete}${onUpdate}`;
+    this.queryBuilder.actualQuery.push({ query, level: QueryLevel.WHERE });
   }
 }
 
@@ -165,13 +153,8 @@ export function createSchemaCallback(table: string, callback: (schema: Schema) =
   qb.db = queryBuilder.db;
   const schema = new Schema(table, qb, queryBuilder);
   callback(schema);
-  const commands = schema.queryBuilder.actualQuery;
-  let query = `CREATE TABLE ${table} (${commands
-    .sort(orderCommands)
-    .map((command) => command.query)
-    .join(', ')})`;
-  // remove more of one space on query to one space
+  const commands = schema.queryBuilder.actualQuery.sort(orderCommands).map((c) => c.query);
+  let query = `CREATE TABLE ${table} (${commands.join(', ')})`;
   query = query.replace(/\s{2,}/g, ' ');
   queryBuilder.queryBrute = query;
-  // transpile commands to create table syntax
 }
