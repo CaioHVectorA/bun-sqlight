@@ -52,7 +52,7 @@ export class QueryBuilder implements IQueryBuilder {
   actualQuery: QueryPart[] = [];
   select(...fields: string[]): this {
     this.actualQuery.push({
-      query: `SELECT ${(Array.isArray(fields) ? fields.join(', ') : fields) || '*'} `,
+      query: `SELECT ${(Array.isArray(fields) ? fields.join(', ') : fields) || '*'}`,
       level: QueryLevel.CLAUSE,
     });
     return this;
