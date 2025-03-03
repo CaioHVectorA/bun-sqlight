@@ -1,55 +1,109 @@
-// TODO
-// motivation: To improve DX, the user dont need to type the primitives.
-// expected usage:
-//
-// int()
-// int().primary().autoincrement().notnull().unique()
-// int().primary().autoincrement().notnull().unique().default(1)
-// string().notnull()
+// API Factory para SQL primitives com encadeamento (pipeline)
+
+export type ColumnBuilder = {
+  value: string;
+  primary(): ColumnBuilder;
+  autoincrement(): ColumnBuilder;
+  notnull(): ColumnBuilder;
+  unique(): ColumnBuilder;
+  default(val: string | number): ColumnBuilder;
+  nullable(): ColumnBuilder;
+  foreign(field: string, reference: string, options: { onDelete: string }): ColumnBuilder;
+  onDelete(value: string): ColumnBuilder;
+  onUpdate(value: string): ColumnBuilder;
+  check(value: string): ColumnBuilder;
+  toString(): string;
+};
+
+const factory = (primitive: () => string): ColumnBuilder => ({
+  value: primitive(),
+
+  primary() {
+    this.value += ' ' + primary();
+    return this;
+  },
+
+  autoincrement() {
+    this.value += ' ' + autoincrement();
+    return this;
+  },
+
+  notnull() {
+    this.value += ' ' + notnull();
+    return this;
+  },
+
+  unique() {
+    this.value += ' ' + unique();
+    return this;
+  },
+
+  default(val: string | number) {
+    this.value += ' ' + _default(val.toString());
+    return this;
+  },
+
+  nullable() {
+    this.value += ' ' + nullable();
+    return this;
+  },
+
+  foreign(field: string, reference: string, options: { onDelete: string }) {
+    this.value += ' ' + foreign(field, reference, options);
+    return this;
+  },
+
+  onDelete(value: string) {
+    this.value += ' ' + onDelete(value);
+    return this;
+  },
+
+  onUpdate(value: string) {
+    this.value += ' ' + onUpdate(value);
+    return this;
+  },
+
+  check(value: string) {
+    this.value += ' ' + check(value);
+    return this;
+  },
+
+  toString() {
+    return this.value.trim();
+  },
+});
 
 // SQLITE 3 Primitives
-const factory = (primitive: () => string) => {
-  let query = primitive();
-};
-export const int = () => 'INT';
-export const string = (size: number = 255) => `VARCHAR(${size})`;
-export const varchar = (size: number = 255) => `VARCHAR(${size})`;
-export const text = () => `TEXT`;
-export const float = () => `FLOAT`;
-export const double = () => `DOUBLE`;
-export const decimal = () => `DECIMAL`;
-export const date = () => `DATE`;
-export const datetime = () => `DATETIME`;
-export const timestamp = () => `TIMESTAMP`;
-export const time = () => `TIME`;
-export const blob = () => `BLOB`;
-export const boolean = () => `BOOLEAN`;
-export const bool = () => `BOOLEAN`;
-export const integer = () => `INTEGER`;
-export const uuid = () => `UUID`;
+export const int = () => factory(() => 'INT');
+export const string = (size: number = 255) => factory(() => `VARCHAR(${size})`);
+export const varchar = (size: number = 255) => factory(() => `VARCHAR(${size})`);
+export const text = () => factory(() => 'TEXT');
+export const float = () => factory(() => 'FLOAT');
+export const double = () => factory(() => 'DOUBLE');
+export const decimal = () => factory(() => 'DECIMAL');
+export const date = () => factory(() => 'DATE');
+export const datetime = () => factory(() => 'DATETIME');
+export const timestamp = () => factory(() => 'TIMESTAMP');
+export const time = () => factory(() => 'TIME');
+export const blob = () => factory(() => 'BLOB');
+export const boolean = () => factory(() => 'BOOLEAN');
+export const bool = () => factory(() => 'BOOLEAN');
+export const integer = () => factory(() => 'INTEGER');
+export const uuid = () => factory(() => 'UUID');
 
-// flags
-export const primary = () => `PRIMARY KEY`;
-export const autoincrement = () => `AUTOINCREMENT`;
-export const notnull = () => `NOT NULL`;
-export const unique = () => `UNIQUE`;
-export const _default = (value: string) => `DEFAULT '${value}'`;
-export const nullable = () => `NULL`;
-export const foreign = (field: string, reference: string, options: { onDelete: string }) =>
+// Flags
+const primary = () => `PRIMARY KEY`;
+const autoincrement = () => `AUTOINCREMENT`;
+const notnull = () => `NOT NULL`;
+const unique = () => `UNIQUE`;
+const _default = (value: string) => `DEFAULT '${value}'`;
+const nullable = () => `NULL`;
+const foreign = (field: string, reference: string, options: { onDelete: string }) =>
   `FOREIGN KEY (${field}) REFERENCES ${reference} ON DELETE ${options.onDelete}`;
-export const onDelete = (value: string) => `ON DELETE ${value}`;
-export const onUpdate = (value: string) => `ON UPDATE ${value}`;
-export const check = (value: string) => `CHECK (${value})`;
+const onDelete = (value: string) => `ON DELETE ${value}`;
+const onUpdate = (value: string) => `ON UPDATE ${value}`;
+const check = (value: string) => `CHECK (${value})`;
 
-const flags = {
-  primary,
-  autoincrement,
-  notnull,
-  unique,
-  _default,
-  nullable,
-  foreign,
-  onDelete,
-  onUpdate,
-  check,
-};
+// Exemplo de uso:
+// console.log( int().primary().autoincrement().notnull().unique().default(1).toString() );
+// console.log( string().notnull().toString() );

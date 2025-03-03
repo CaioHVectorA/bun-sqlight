@@ -6,6 +6,7 @@ import { createSchemaCallback, Schema } from './schema';
 import type { Tables } from './table';
 import { invertObject } from '../utils/invert-obj';
 import { normalizeInsertData } from './normalize-insert-data';
+import type { ColumnBuilder } from './schema/primitives';
 export enum Comparison {
   EQUAL = '=',
   NOT_EQUAL = '!=',
@@ -133,16 +134,20 @@ export class QueryBuilder implements IQueryBuilder {
   }
   createTable(
     table: string,
-    fields: { [key: string]: string } | ((schema: Schema) => void),
+    fields: { [key: string]: string | ColumnBuilder } | ((schema: Schema) => void),
     options: SchemaOptions = { exists: true }
   ): this {
     if (typeof fields === 'function') {
       createSchemaCallback(table, fields, this);
       return this;
     }
+    const resolveColumnBuilder = (column: string | ColumnBuilder) => {
+      if (typeof column === 'string') return column;
+      return column.toString();
+    };
     this.actualQuery.push({
       query: `CREATE TABLE ${table} (${Object.entries(fields)
-        .map(([key, value]) => `${key} ${value}`)
+        .map(([key, value]) => `${key} ${resolveColumnBuilder(value)}`)
         .join(', ')})`,
       level: QueryLevel.TABLE,
     });
