@@ -7,6 +7,7 @@ import type { Tables } from './table';
 import { invertObject } from '../utils/invert-obj';
 import { normalizeInsertData } from './normalize-insert-data';
 import type { ColumnBuilder } from './schema/primitives';
+import { generateTableTypes } from './type-generator';
 export enum Comparison {
   EQUAL = '=',
   NOT_EQUAL = '!=',
@@ -15,6 +16,14 @@ export enum Comparison {
   GREATER_THAN_OR_EQUAL = '>=',
   LESS_THAN_OR_EQUAL = '<=',
 }
+
+export type ColumnMetadata = {
+  sqlType: string;
+  tsType: string;
+  nullable: boolean;
+  hasDefault: boolean;
+  isPrimary?: boolean;
+};
 export enum QueryLevel {
   CLAUSE = 1,
   TABLE = 2,
@@ -151,6 +160,7 @@ export class QueryBuilder implements IQueryBuilder {
         .join(', ')})`,
       level: QueryLevel.TABLE,
     });
+    generateTableTypes(table, this.tables[table]);
     return this;
     // SELECT * FROM users
   }

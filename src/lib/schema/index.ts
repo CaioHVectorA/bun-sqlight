@@ -1,5 +1,6 @@
 import type { SQLITE_TYPES } from '../../utils/sqlite.types';
-import { QueryBuilder, QueryLevel, type IQueryBuilder } from '../query-builder';
+import { QueryBuilder, QueryLevel, type ColumnMetadata, type IQueryBuilder } from '../query-builder';
+import { mapType } from '../type-generator';
 
 type Options<T> = Partial<{
   default: T;
@@ -56,13 +57,26 @@ export class Schema implements TableSchemaHandles {
     const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
     const query = `${name} ${type} ${defaultText} ${uniqueText} ${nullableText}`.replace(/\s+/g, ' ').trim();
     this.queryBuilder.actualQuery.push({ query, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = type;
+    const tsType = mapType(type);
+    const columnMeta: ColumnMetadata = {
+      sqlType: type,
+      tsType,
+      nullable: options?.nullable || false,
+      hasDefault: options?.default !== undefined,
+    };
+    this.mainQuerybuilder.tables[this.table][name] = columnMeta;
   }
 
   id(name = 'id'): void {
     const query = `${name} INTEGER PRIMARY KEY AUTOINCREMENT`;
     this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'INTEGER';
+    this.mainQuerybuilder.tables[this.table][name] = {
+      sqlType: 'INTEGER',
+      tsType: 'number',
+      isPrimary: true,
+      hasDefault: true,
+      nullable: false,
+    };
   }
 
   string(name: string, options?: Options<string>): void {
@@ -109,7 +123,13 @@ export class Schema implements TableSchemaHandles {
     });
     const query = `${name} UUID PRIMARY KEY`;
     this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = 'UUID';
+    this.mainQuerybuilder.tables[this.table][name] = {
+      sqlType: 'UUID',
+      tsType: 'string',
+      isPrimary: true,
+      hasDefault: true,
+      nullable: false,
+    };
   }
 
   timestamps(): void {
