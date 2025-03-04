@@ -16,8 +16,8 @@ export enum Comparison {
   GREATER_THAN_OR_EQUAL = '>=',
   LESS_THAN_OR_EQUAL = '<=',
 }
-type TypeTables = Omit<typeof import('../generated')['default'], 'prototype'>;
-type TableNames = keyof TypeTables;
+export type TypeTables = Omit<typeof import('../generated')['default'], 'prototype'>;
+export type TableNames = keyof TypeTables;
 export type ColumnMetadata = {
   sqlType: string;
   tsType: string;
