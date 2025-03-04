@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { QueryBuilder } from './query-builder';
 import { MetricTimer } from '../utils/metric-timer';
 import type { Hooks } from './hooks';
+import { validateSQLQuery } from './analyze-is-malicious';
 
 export class DatabaseManager {
   private builder: QueryBuilder;
@@ -49,6 +50,7 @@ export class DatabaseManager {
         if (method.toUpperCase().includes('TABLE')) {
           const query = builderResult.run(); // Obter a query final
           console.log(`Running query: \n ${query}`);
+          validateSQLQuery(query);
           this.db.exec(query); // Executa a query no banco
           this.builder.queryBrute = undefined;
           return;
@@ -56,6 +58,7 @@ export class DatabaseManager {
         if (method === 'run') {
           const query = this.builder.run(); // Obter a query final
           // return this.db.query(builderResult).all(); // Executa a query no banco
+          validateSQLQuery(query);
           console.log(`Running query: \n ${builderResult ?? query}`);
           return this.db.query(builderResult).all(); // Executa a query no banco
         }
@@ -68,6 +71,7 @@ export class DatabaseManager {
     return new Database(db);
   }
   raw(query: string) {
+    validateSQLQuery(query);
     return this.db.query(query).all();
   }
 }
