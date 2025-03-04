@@ -3,6 +3,7 @@
 # Logs
 /*.db
 logs
+playground
 _.log
 npm-debug.log_
 yarn-debug.log*
