@@ -67,4 +67,7 @@ export class DatabaseManager {
   static getDb(db: string) {
     return new Database(db);
   }
+  raw(query: string) {
+    return this.db.query(query).all();
+  }
 }
