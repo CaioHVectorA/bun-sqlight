@@ -6,6 +6,8 @@ import { createSchemaCallback, Schema } from './schema';
 import type { Tables } from './table';
 import { invertObject } from '../utils/invert-obj';
 import { normalizeInsertData } from './normalize-insert-data';
+import type { ColumnBuilder } from './schema/primitives';
+import { generateTableTypes } from './type-generator';
 export enum Comparison {
   EQUAL = '=',
   NOT_EQUAL = '!=',
@@ -14,6 +16,15 @@ export enum Comparison {
   GREATER_THAN_OR_EQUAL = '>=',
   LESS_THAN_OR_EQUAL = '<=',
 }
+type TypeTables = Omit<typeof import('../generated')['default'], 'prototype'>;
+type TableNames = keyof TypeTables;
+export type ColumnMetadata = {
+  sqlType: string;
+  tsType: string;
+  nullable: boolean;
+  hasDefault: boolean;
+  isPrimary?: boolean;
+};
 export enum QueryLevel {
   CLAUSE = 1,
   TABLE = 2,
@@ -32,7 +43,7 @@ export interface IQueryBuilder {
   tables: Tables;
   db?: DatabaseManager;
   actualQuery: QueryPart[];
-  select(...fields: string[]): this;
+  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'])[]): this;
   from(table: string): this;
   where(field: string, value: any): this;
   orWhere(field: string, value: any): this;
@@ -50,14 +61,14 @@ export class QueryBuilder implements IQueryBuilder {
   queryBrute?: string;
   db?: DatabaseManager;
   actualQuery: QueryPart[] = [];
-  select(...fields: string[]): this {
+  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'])[]): this {
     this.actualQuery.push({
       query: `SELECT ${(Array.isArray(fields) ? fields.join(', ') : fields) || '*'}`,
       level: QueryLevel.CLAUSE,
     });
     return this;
   }
-  from(table: string): this {
+  from<T extends TableNames>(table: T): this {
     this.actualQuery.push({ query: `FROM ${table}`, level: QueryLevel.TABLE });
     return this;
   }
@@ -124,7 +135,7 @@ export class QueryBuilder implements IQueryBuilder {
     });
     return this;
   }
-  dropTable(table: string): this {
+  dropTable<T extends TableNames>(table: T): this {
     this.actualQuery.push({
       query: `DROP TABLE ${table}`,
       level: QueryLevel.TABLE,
@@ -133,23 +144,28 @@ export class QueryBuilder implements IQueryBuilder {
   }
   createTable(
     table: string,
-    fields: { [key: string]: string } | ((schema: Schema) => void),
+    fields: { [key: string]: string | ColumnBuilder } | ((schema: Schema) => void),
     options: SchemaOptions = { exists: true }
   ): this {
     if (typeof fields === 'function') {
       createSchemaCallback(table, fields, this);
       return this;
     }
+    const resolveColumnBuilder = (column: string | ColumnBuilder) => {
+      if (typeof column === 'string') return column;
+      return column.toString();
+    };
     this.actualQuery.push({
       query: `CREATE TABLE ${table} (${Object.entries(fields)
-        .map(([key, value]) => `${key} ${value}`)
+        .map(([key, value]) => `${key} ${resolveColumnBuilder(value)}`)
         .join(', ')})`,
       level: QueryLevel.TABLE,
     });
+    generateTableTypes(table, this.tables[table]);
     return this;
     // SELECT * FROM users
   }
-  insert(table: string, data: Record<string, any>): this {
+  insert<T extends TableNames>(table: T, data: TypeTables[T]['insert']): this {
     const keys = Object.keys(data);
     const values = Object.values(data);
     this.actualQuery.push({
@@ -158,7 +174,7 @@ export class QueryBuilder implements IQueryBuilder {
     });
     return this;
   }
-  update(table: string, data: Record<string, any>): this {
+  update<T extends TableNames>(table: T, data: TypeTables[T]['update']): this {
     this.actualQuery.push({
       query: `UPDATE ${table} SET ${Object.entries(data)
         .map(([key, value]) => `${key} = ${typeof value === 'string' ? `"${value}"` : value}`)
