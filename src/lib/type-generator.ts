@@ -15,6 +15,7 @@ export function mapType(sqlType: SQLITE_TYPES): string {
     case 'TEXT':
     case 'DATE':
     case 'DATETIME':
+    case 'TIMESTAMP':
     case 'UUID':
       return 'string';
     case 'BOOLEAN':
