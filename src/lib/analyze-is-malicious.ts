@@ -62,6 +62,12 @@ function validateSQLQuery(query: string): void {
       throw new Error(`Malicious query detected: pattern '${pattern}' found in query "${query}"`);
     }
   }
+  // Detect UPDATE or DELETE statements without a WHERE clause
+  const updateDeleteWithoutWhere = /\b(update|delete)\b\s+(?!.*\bwhere\b)/i;
+
+  if (updateDeleteWithoutWhere.test(query)) {
+    throw new Error(`Malicious query detected: UPDATE or DELETE without WHERE clause in query "${query}"`);
+  }
 }
 
 export { validateSQLQuery };

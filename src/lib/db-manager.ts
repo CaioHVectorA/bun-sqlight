@@ -70,6 +70,9 @@ export class DatabaseManager {
   static getDb(db: string) {
     return new Database(db);
   }
+  close() {
+    this.db.close();
+  }
   raw(query: string) {
     validateSQLQuery(query);
     return this.db.query(query).all();
