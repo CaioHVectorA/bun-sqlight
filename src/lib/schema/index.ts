@@ -1,6 +1,6 @@
 import type { SQLITE_TYPES } from '../../utils/sqlite.types';
 import { QueryBuilder, QueryLevel, type ColumnMetadata, type IQueryBuilder } from '../query-builder';
-import { mapType } from '../type-generator';
+import { generateTableTypes, mapType } from '../type-generator';
 
 type Options<T> = Partial<{
   default: T;
@@ -39,12 +39,12 @@ export class Schema implements TableSchemaHandles {
   queryBuilder: IQueryBuilder;
   table: string;
   mainQuerybuilder: IQueryBuilder;
-
   constructor(table: string, queryBuilder: IQueryBuilder, mainQuerybuilder: IQueryBuilder) {
     this.queryBuilder = queryBuilder;
     this.table = table;
     this.mainQuerybuilder = mainQuerybuilder;
     this.mainQuerybuilder.tables[table] = {};
+    this.queryBuilder.tables[table] = {};
   }
 
   // Método auxiliar para reduzir a repetição na criação de colunas
@@ -65,18 +65,21 @@ export class Schema implements TableSchemaHandles {
       hasDefault: options?.default !== undefined,
     };
     this.mainQuerybuilder.tables[this.table][name] = columnMeta;
+    this.queryBuilder.tables[this.table][name] = columnMeta;
   }
 
   id(name = 'id'): void {
     const query = `${name} INTEGER PRIMARY KEY AUTOINCREMENT`;
     this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = {
+    const columnMeta: ColumnMetadata = {
       sqlType: 'INTEGER',
       tsType: 'number',
       isPrimary: true,
       hasDefault: true,
       nullable: false,
     };
+    this.queryBuilder.tables[this.table][name] = columnMeta;
+    this.mainQuerybuilder.tables[this.table][name] = columnMeta;
   }
 
   string(name: string, options?: Options<string>): void {
@@ -123,13 +126,15 @@ export class Schema implements TableSchemaHandles {
     });
     const query = `${name} UUID PRIMARY KEY`;
     this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
-    this.mainQuerybuilder.tables[this.table][name] = {
+    const columnMeta: ColumnMetadata = {
       sqlType: 'UUID',
       tsType: 'string',
       isPrimary: true,
       hasDefault: true,
       nullable: false,
     };
+    this.mainQuerybuilder.tables[this.table][name] = columnMeta;
+    this.queryBuilder.tables[this.table][name] = columnMeta;
   }
 
   timestamps(): void {
@@ -173,6 +178,7 @@ export function createSchemaCallback(table: string, callback: (schema: Schema) =
   qb.db = queryBuilder.db;
   const schema = new Schema(table, qb, queryBuilder);
   callback(schema);
+  generateTableTypes(table, queryBuilder.tables[table]);
   const commands = schema.queryBuilder.actualQuery.sort(orderCommands).map((c) => c.query);
   let query = `CREATE TABLE ${table} (${commands.join(', ')})`;
   query = query.replace(/\s{2,}/g, ' ');
