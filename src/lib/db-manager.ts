@@ -41,7 +41,7 @@ export class DatabaseManager {
 
   // Explicitly defined QueryBuilder methods
 
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] & '*')[]): this {
+  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this {
     this.builder.select(...fields);
     return this;
   }
@@ -102,40 +102,40 @@ export class DatabaseManager {
 
   insert<T extends TableNames>(table: T, data: TypeTables[T]['insert']): this {
     // Process before insert hooks
+    this.builder.insert(table, data);
     const callbacks = this.hooks.beforeInsert.filter((action) => !!action[table]).map((action) => action[table]);
-
     callbacks.forEach((callback) => {
-      callback(this.builder.insert(table, data));
+      callback(this.builder.actualQuery);
     });
 
-    const query = this.builder.run();
-    console.log(`Running query: \n ${query}`);
-    validateSQLQuery(query);
-    this.db.query(query).all();
+    // const query = this.builder.run();
+    // console.log(`Running query: \n ${query}`);
+    // validateSQLQuery(query);
+    // this.db.query(query).all();
     return this;
   }
 
   update<T extends TableNames>(table: T, data: TypeTables[T]['update']): this {
     // Process before update hooks
+    this.builder.update(table, data);
     const callbacks = this.hooks.beforeUpdate.filter((action) => !!action[table]).map((action) => action[table]);
-
     callbacks.forEach((callback) => {
-      callback(this.builder.update(table, data));
+      callback(this.builder.actualQuery);
     });
 
-    const query = this.builder.run();
-    console.log(`Running query: \n ${query}`);
-    validateSQLQuery(query);
-    this.db.query(query).all();
+    // const query = this.builder.run();
+    // console.log(`Running query: \n ${query}`);
+    // validateSQLQuery(query);
+    // this.db.query(query).all();
     return this;
   }
 
   delete(table: string): this {
     this.builder.delete(table);
-    const query = this.builder.run();
-    console.log(`Running query: \n ${query}`);
-    validateSQLQuery(query);
-    this.db.query(query).all();
+    // const query = this.builder.run();
+    // console.log(`Running query: \n ${query}`);
+    // validateSQLQuery(query);
+    // this.db.query(query).all();
     return this;
   }
 
@@ -158,6 +158,7 @@ export class DatabaseManager {
   }
 
   run() {
+    console.log({ query: this.builder.actualQuery });
     const query = this.builder.run();
     console.log(`Running query: \n ${query}`);
     validateSQLQuery(query);

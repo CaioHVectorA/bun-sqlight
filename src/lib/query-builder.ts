@@ -62,7 +62,7 @@ export class QueryBuilder implements IQueryBuilder {
   queryBrute?: string;
   db?: DatabaseManager;
   actualQuery: QueryPart[] = [];
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] & '*')[]): this {
+  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this {
     this.actualQuery.push({
       query: `SELECT ${(Array.isArray(fields) ? fields.join(', ') : fields) || '*'}`,
       level: QueryLevel.CLAUSE,
