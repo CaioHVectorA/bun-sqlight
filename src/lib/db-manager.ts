@@ -7,6 +7,7 @@ import { Comparison } from './query-builder';
 import type { Tables } from './table';
 import type { TypeTables } from './query-builder';
 import type { TableNames } from './query-builder';
+import type { Schema } from './schema';
 
 export class DatabaseManager {
   private builder: QueryBuilder;
@@ -89,7 +90,7 @@ export class DatabaseManager {
 
   createTable(
     table: string,
-    fields: { [key: string]: string } | ((schema: any) => void),
+    fields: { [key: string]: string } | ((schema: Schema) => void),
     options: { exists?: boolean } = { exists: true }
   ): this {
     const query = this.builder.createTable(table, fields, options).run();
