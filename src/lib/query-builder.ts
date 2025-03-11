@@ -7,7 +7,8 @@ import type { Tables } from './table';
 import { invertObject } from '../utils/invert-obj';
 import { normalizeInsertData } from './normalize-insert-data';
 import type { ColumnBuilder } from './schema/primitives';
-import { generateTableTypes } from './type-generator';
+import { generateTableTypes, mapType } from './type-generator';
+import type { SQLITE_TYPES } from '../utils/sqlite.types';
 export enum Comparison {
   EQUAL = '=',
   NOT_EQUAL = '!=',
@@ -16,8 +17,8 @@ export enum Comparison {
   GREATER_THAN_OR_EQUAL = '>=',
   LESS_THAN_OR_EQUAL = '<=',
 }
-type TypeTables = Omit<typeof import('../generated')['default'], 'prototype'>;
-type TableNames = keyof TypeTables;
+export type TypeTables = Omit<typeof import('../generated')['default'], 'prototype'>;
+export type TableNames = keyof TypeTables;
 export type ColumnMetadata = {
   sqlType: string;
   tsType: string;
@@ -61,7 +62,7 @@ export class QueryBuilder implements IQueryBuilder {
   queryBrute?: string;
   db?: DatabaseManager;
   actualQuery: QueryPart[] = [];
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'])[]): this {
+  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this {
     this.actualQuery.push({
       query: `SELECT ${(Array.isArray(fields) ? fields.join(', ') : fields) || '*'}`,
       level: QueryLevel.CLAUSE,
@@ -161,6 +162,18 @@ export class QueryBuilder implements IQueryBuilder {
         .join(', ')})`,
       level: QueryLevel.TABLE,
     });
+    console.log({ fields });
+    this.tables[table] = Object.entries(fields).reduce((acc, [key, value]) => {
+      const sqlType = value.toString().split(' ')[0] as SQLITE_TYPES;
+      acc[key] = {
+        sqlType,
+        tsType: mapType(sqlType),
+        nullable: false,
+        hasDefault: false,
+      };
+      return acc;
+    }, {} as Record<string, ColumnMetadata>);
+    console.log(this.tables);
     generateTableTypes(table, this.tables[table]);
     return this;
     // SELECT * FROM users

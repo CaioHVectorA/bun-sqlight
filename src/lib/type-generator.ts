@@ -15,6 +15,7 @@ export function mapType(sqlType: SQLITE_TYPES): string {
     case 'TEXT':
     case 'DATE':
     case 'DATETIME':
+    case 'TIMESTAMP':
     case 'UUID':
       return 'string';
     case 'BOOLEAN':
@@ -27,6 +28,7 @@ export function mapType(sqlType: SQLITE_TYPES): string {
 }
 
 export function generateTableTypes(tableName: string, columns: Record<string, ColumnMetadata>) {
+  console.log({ tableName, columns });
   const selectFields = Object.entries(columns)
     .map(([name, meta]) => `${name}: ${meta.tsType}${meta.nullable ? ' | null' : ''}`)
     .join('\n  ');
