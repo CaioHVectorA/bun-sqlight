@@ -5,9 +5,8 @@ import type { Hooks } from './hooks';
 import { validateSQLQuery } from './analyze-is-malicious';
 import { Comparison } from './query-builder';
 import type { Tables } from './table';
-import type { TypeTables } from './query-builder';
-import type { TableNames } from './query-builder';
 import type { Schema } from './schema';
+import type { TableNames, TypeTables } from 'table-types';
 
 export class DatabaseManager {
   private builder: QueryBuilder;
