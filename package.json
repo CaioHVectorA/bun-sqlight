@@ -1,9 +1,13 @@
 {
   "name": "bun-sqligth",
   "module": "index.ts",
+  "main": "dist/out.js",
+  "version": "1.0.0",
+  "types": "src/sqlight.d.ts",
   "type": "module",
   "scripts": {
-    "build": "bun build --target=bun --outfile=dist/out.js src/lib/db-manager.ts --minify"
+    "build": "bun build.ts",
+    "tsc": "tsc src/index.ts --outDir dist-ts --declaration --declarationMap --sourceMap --skipLibCheck"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.5.1",

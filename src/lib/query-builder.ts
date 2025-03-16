@@ -1,7 +1,4 @@
-import { Database } from 'bun:sqlite';
-import { sql } from 'bun';
 import { DatabaseManager } from './db-manager';
-import type { Hooks } from './hooks';
 import { createSchemaCallback, Schema } from './schema';
 import type { Tables } from './table';
 import { invertObject } from '../utils/invert-obj';
@@ -9,6 +6,7 @@ import { normalizeInsertData } from './normalize-insert-data';
 import type { ColumnBuilder } from './schema/primitives';
 import { generateTableTypes, mapType } from './type-generator';
 import type { SQLITE_TYPES } from '../utils/sqlite.types';
+import type { TableNames, TypeTables } from 'table-types';
 export enum Comparison {
   EQUAL = '=',
   NOT_EQUAL = '!=',
@@ -17,8 +15,6 @@ export enum Comparison {
   GREATER_THAN_OR_EQUAL = '>=',
   LESS_THAN_OR_EQUAL = '<=',
 }
-export type TypeTables = Omit<typeof import('../generated')['default'], 'prototype'>;
-export type TableNames = keyof TypeTables;
 export type ColumnMetadata = {
   sqlType: string;
   tsType: string;
