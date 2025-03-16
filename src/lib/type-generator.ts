@@ -1,4 +1,3 @@
-// Novo arquivo type-generator.ts
 import type { SQLITE_TYPES } from '../utils/sqlite.types';
 import { type ColumnMetadata } from './query-builder';
 import { readFileSync, writeFileSync } from 'fs';
@@ -52,11 +51,11 @@ export interface ${tableName}Insert {
 
 export type ${tableName}Update = ${updateType};
   `;
-  console.log('Called!');
   const dir = dirname(`src/generated/${tableName}.types.ts`);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
+  console.log({ dirname: dirname(`src/generated/${tableName}.types.ts`), _dirname: __dirname + `src/generated/${tableName}.types.ts` });
   writeFileSync(`src/generated/${tableName}.types.ts`, typeContent);
   // now generated/index should have a map of all table names.
   // some thing like:

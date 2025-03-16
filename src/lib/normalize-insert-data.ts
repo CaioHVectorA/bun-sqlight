@@ -12,10 +12,10 @@ export const normalizeInsertData = (t: Tables, table: string, keys: string[]) =>
   if (value instanceof Date) {
     const actualTable = t[table];
     const field = actualTable[keys[index]];
-    if (field === 'DATE') {
+    if (field.sqlType === 'DATE') {
       return `"${value.toISOString().split('T')[0]}"`; // -> "2021-01-01"
     }
-    if (field === 'DATETIME' || field === 'TIMESTAMP') {
+    if (field.sqlType === 'DATETIME' || field.sqlType === 'TIMESTAMP') {
       return `"${value.toISOString().replace('T', ' ').replace('Z', '')}"`; // -> "2021-01-01 00:00:00"
     }
     return `"${value.toISOString()}"`; // -> "2021-01-01T00:00:00.000Z"

@@ -1,5 +1,5 @@
-import { Database as _db } from 'bun:sqlite';
-export class Database extends _db {
+import { Database } from 'bun:sqlite';
+export class SqlightBaseDatabase extends Database {
   constructor(filename: string) {
     super(filename);
   }
