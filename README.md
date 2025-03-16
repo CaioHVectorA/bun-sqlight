@@ -7,6 +7,10 @@ Bun sqlight is a SQLite abstraction layer for Bun sqlite API. Focus on zero depe
 
 ## Installation
 
+```bash
+$ bun install bun-sqlight
+```
+
 ### Initialize
 
 ```ts
