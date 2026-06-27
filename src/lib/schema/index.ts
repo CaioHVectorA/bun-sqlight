@@ -175,12 +175,12 @@ export class Schema implements TableSchemaHandles {
   }
 }
 
-export function createSchemaCallback(table: string, callback: (schema: Schema) => void, queryBuilder: IQueryBuilder) {
+export function createSchemaCallback(table: string, callback: (schema: Schema) => void, queryBuilder: IQueryBuilder<any, any>) {
   const qb = new QueryBuilder();
   qb.db = queryBuilder.db;
   const schema = new Schema(table, qb, queryBuilder);
   callback(schema);
-  generateTableTypes(table, queryBuilder.tables[table]);
+  generateTableTypes(table, queryBuilder.tables[table], queryBuilder.db?.options);
   const commands = schema.queryBuilder.actualQuery.sort(orderCommands).map((c) => c.query);
   let query = `CREATE TABLE ${table} (${commands.join(', ')})`;
   query = query.replace(/\s{2,}/g, ' ');

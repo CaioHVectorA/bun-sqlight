@@ -5,8 +5,12 @@
   "version": "1.0.0",
   "types": "src/sqlight.d.ts",
   "type": "module",
+  "bin": {
+    "bun-sqlight": "./dist/cli.js"
+  },
   "scripts": {
     "build": "bun build.ts",
+    "playground": "bun run playground/run-all.ts",
     "tsc": "tsc src/index.ts --outDir dist-ts --declaration --declarationMap --sourceMap --skipLibCheck"
   },
   "devDependencies": {

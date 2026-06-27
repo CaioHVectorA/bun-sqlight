@@ -1,4 +1,4 @@
-import { Sqlight } from './dist/src';
+import { Sqlight } from './dist/index.js';
 const db = new Sqlight();
 db.createTable('users', {
   id: 'INTEGER PRIMARY KEY',
@@ -17,5 +17,4 @@ for (let i = 0; i < 10; i++) {
     age: i,
     id: i,
   }).run();
-}
-// console.log(db.select('*').from('users').where('age', '>', 5).run());
+}

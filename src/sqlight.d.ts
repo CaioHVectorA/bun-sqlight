@@ -1,161 +1,254 @@
 // sqlight.d.ts
-import Tables from './generated/index';
-/**
- * SQLight Library Type Declarations
- *
- * This file contains type definitions and JSDoc descriptions for the SQLight library.
- */
+// Complete type declarations for the bun-sqlight library.
+
+declare module 'bun-sqlight' {
+  export { Sqlight } from './lib/connect';
+}
 
 /**
- * Represents a comparison operator for query conditions.
+ * Comparison operators for WHERE and JOIN conditions.
  */
 type Comparison = '=' | '!=' | '>' | '<' | '>=' | '<=';
 
 /**
- * Lifecycle hooks for database operations.
- * @template T - Table name type extending string literals.
+ * Column options available when defining schema columns.
  */
-interface Hooks<T extends string = string> {
-  /**
-   * Callbacks executed after an insert operation.
-   */
-  afterInsert: Array<(data: any) => void>;
-  /**
-   * Callbacks executed after an update operation.
-   */
-  afterUpdate: Array<(data: any) => void>;
-  /**
-   * Callbacks executed before an insert operation.
-   */
-  beforeInsert: Array<(data: any) => void>;
-  /**
-   * Callbacks executed before an update operation.
-   */
-  beforeUpdate: Array<(data: any) => void>;
-  /**
-   * Callbacks executed before a select operation.
-   */
-  beforeSelect: Array<(query: string) => void>;
-  /**
-   * Callbacks executed after a select operation.
-   */
-  afterSelect: Array<(results: any[]) => void>;
-}
-
-/**
- * Metadata structure for database columns.
- */
-interface ColumnMetadata {
-  /**
-   * SQLite data type for the column.
-   */
-  type: SQLITE_TYPES;
-  /**
-   * Whether the column is nullable.
-   */
+interface ColumnOptions<T = any> {
+  /** Default value for the column */
+  default?: T;
+  /** Whether to add a UNIQUE constraint */
+  unique?: boolean;
+  /** Whether the column allows NULL values (defaults to NOT NULL) */
   nullable?: boolean;
-  /**
-   * Default value for the column.
-   */
-  defaultValue?: any;
-  /**
-   * Whether the column is a primary key.
-   */
-  primaryKey?: boolean;
 }
 
 /**
- * Type mapping for table structures and operations.
- * @template T - Table name type.
+ * Foreign key constraint options.
  */
-interface TypeTables<T extends string = string> {
-  [key: string]: {
-    /**
-     * Data structure for SELECT operations
-     */
-    select: Record<string, any>;
-    /**
-     * Data structure for INSERT operations
-     */
-    insert: Record<string, any>;
-    /**
-     * Data structure for UPDATE operations
-     */
-    update: Record<string, any>;
-  };
+interface ForeignKeyOptions extends ColumnOptions<string> {
+  /** Action on parent row deletion */
+  onDelete?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
+  /** Action on parent row update */
+  onUpdate?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
 }
 
 /**
- * Union type of available table names.
+ * Schema callback interface for defining table columns.
+ * Used inside the `createTable` callback.
  */
-type TableNames = keyof Tables;
+interface SchemaBuilder {
+  /** Define an autoincrementing integer primary key column */
+  id(name?: string): void;
+  /** Define a UUID primary key column with auto-generation hook */
+  uuid(name?: string): void;
+  /** Define a TEXT column */
+  string(name: string, options?: ColumnOptions<string>): void;
+  /** Define an INTEGER column */
+  integer(name: string, options?: ColumnOptions<number>): void;
+  /** Define a BOOLEAN column (stored as 0/1) */
+  boolean(name: string, options?: ColumnOptions<boolean>): void;
+  /** Define a REAL (float) column */
+  float(name: string, options?: ColumnOptions<number>): void;
+  /** Define a DATE column (YYYY-MM-DD) */
+  date(name: string, options?: ColumnOptions<string>): void;
+  /** Define a DATETIME column (YYYY-MM-DD HH:MM:SS) */
+  datetime(name: string, options?: ColumnOptions<string>): void;
+  /** Add created_at and updated_at TIMESTAMP columns with auto-update hooks */
+  timestamps(): void;
+  /** Define a foreign key column referencing another table */
+  foreign(
+    name: string,
+    reference: `${string}.${string}`,
+    options?: ForeignKeyOptions
+  ): void;
+}
 
 /**
- * Main database manager class providing query building and execution capabilities.
+ * Join options for configuring table join behavior.
  */
-declare class DatabaseManager {
+interface JoinOptions {
+  /** Type of SQL JOIN */
+  type?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+  /** Comparison operator for the ON clause */
+  comparison?: Comparison;
+  /** Table alias mapping, e.g. { users: 'U', products: 'P' } */
+  alias?: Record<string, string>;
+}
+
+/**
+ * Main database class for bun-sqlight.
+ * Provides a chainable query builder and schema management API.
+ *
+ * @example
+ * ```ts
+ * import { Sqlight } from 'bun-sqlight';
+ * const db = new Sqlight('myDb.db');
+ * ```
+ */
+export interface TableSchemaShape {
+  select: Record<string, any>;
+  insert: Record<string, any>;
+  update: Record<string, any>;
+}
+
+export interface SqlightOptions {
+  typesOutputFile?: string;
+}
+
+export declare class Sqlight<
+  TypeTablesSchema extends Record<keyof TypeTablesSchema, TableSchemaShape> = any,
+  TableNamesSchema extends keyof TypeTablesSchema & string = keyof TypeTablesSchema & string
+> {
   /**
-   * @param builder - Query builder instance
-   * @param db - SQLite database instance
+   * Create a new SQLite database connection.
+   * @param filename - Path to the database file. Defaults to ':memory:' for an in-memory database.
+   * @param options - Options for configuring the database client.
    */
-  constructor(builder: QueryBuilder, db: Database);
+  constructor(filename?: string, options?: SqlightOptions);
 
   /**
-   * Hooks registry for database operations
+   * Close the database connection.
    */
-  private hooks: Hooks;
+  close(): void;
 
   /**
-   * Execute raw SQL query
-   * @param query - Raw SQL string
-   * @returns Query results
+   * Execute a raw SQL query string.
+   * The query is validated against SQL injection patterns before execution.
+   * @param query - Raw SQL string to execute.
+   * @returns Array of result rows.
    */
-  raw<T>(query: string): T[];
+  raw<T = Record<string, any>>(query: string): T[];
+
+  // ─── Schema Management ───────────────────────────────────────────────
 
   /**
-   * SELECT query builder
-   * @param fields - Fields to select ('*' for all)
+   * Create a new table using a schema callback.
+   * @param table - Name of the table to create.
+   * @param fields - Callback that receives a SchemaBuilder to define columns.
    */
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this;
+  createTable(table: string, fields: (schema: SchemaBuilder) => void): this;
 
   /**
-   * FROM clause builder
-   * @param table - Table name to query from
+   * Create a new table using an object of column definitions.
+   * @param table - Name of the table to create.
+   * @param fields - Object mapping column names to SQL type strings.
    */
-  from<T extends TableNames>(table: T): this;
+  createTable(table: string, fields: Record<string, string>): this;
 
   /**
-   * WHERE condition builder
-   * @param field - Column name
-   * @param valueOrComparison - Comparison operator or direct value
-   * @param value - Comparison value (if operator provided)
+   * Drop a table from the database.
+   * @param table - Name of the table to drop.
    */
-  where(field: string, valueOrComparison: any, value?: any): this;
+  dropTable<T extends TableNamesSchema>(table: T): this;
+
+  // ─── SELECT ──────────────────────────────────────────────────────────
 
   /**
-   * Execute built query
-   * @returns Query results
+   * Begin a SELECT query.
+   * @param fields - Column names to select, or '*' for all.
+   */
+  select<T extends TableNamesSchema>(...fields: (keyof TypeTablesSchema[T]['select'] | '*')[]): this;
+
+  /**
+   * Specify the table to query FROM.
+   * @param table - Table name.
+   */
+  from<T extends TableNamesSchema>(table: T): this;
+
+  // ─── WHERE ───────────────────────────────────────────────────────────
+
+  /**
+   * Add a WHERE condition (AND).
+   * @param field - Column name.
+   * @param value - Value to compare with (uses '=' operator).
+   */
+  where(field: string, value: any): this;
+
+  /**
+   * Add a WHERE condition with a comparison operator (AND).
+   * @param field - Column name.
+   * @param comparison - Comparison operator ('=', '!=', '>', '<', '>=', '<=').
+   * @param value - Value to compare with.
+   */
+  where(field: string, comparison: Comparison, value: any): this;
+
+  /**
+   * Add an OR WHERE condition.
+   * @param field - Column name.
+   * @param value - Value to compare with (uses '=' operator).
+   */
+  orWhere(field: string, value: any): this;
+
+  /**
+   * Add an OR WHERE condition with a comparison operator.
+   * @param field - Column name.
+   * @param comparison - Comparison operator.
+   * @param value - Value to compare with.
+   */
+  orWhere(field: string, comparison: Comparison, value: any): this;
+
+  // ─── ORDER, LIMIT, OFFSET ───────────────────────────────────────────
+
+  /**
+   * Add an ORDER BY clause.
+   * @param field - Column name to sort by.
+   * @param direction - Sort direction: 'ASC' or 'DESC'.
+   */
+  orderBy(field: string, direction: 'ASC' | 'DESC'): this;
+
+  /**
+   * Limit the number of returned rows.
+   * @param limit - Maximum number of rows.
+   */
+  limit(limit: number): this;
+
+  /**
+   * Skip a number of rows (used with limit for pagination).
+   * @param offset - Number of rows to skip.
+   */
+  offset(offset: number): this;
+
+  // ─── INSERT / UPDATE / DELETE ───────────────────────────────────────
+
+  /**
+   * Insert a new row into a table.
+   * @param table - Table name.
+   * @param data - Object mapping column names to values.
+   */
+  insert<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['insert']): this;
+
+  /**
+   * Update rows in a table. Must be followed by `.where()`.
+   * @param table - Table name.
+   * @param data - Object mapping column names to new values.
+   */
+  update<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['update']): this;
+
+  /**
+   * Delete rows from a table. Must be followed by `.where()`.
+   * @param table - Table name.
+   */
+  delete(table: string): this;
+
+  // ─── JOIN ───────────────────────────────────────────────────────────
+
+  /**
+   * Join another table.
+   * @param target - Target column in format 'table.column'.
+   * @param reference - Reference column in format 'table.column'.
+   * @param options - Optional join configuration (type, comparison, alias).
+   */
+  join(
+    target: `${string}.${string}`,
+    reference: `${string}.${string}`,
+    options?: JoinOptions
+  ): this;
+
+  // ─── Execution ──────────────────────────────────────────────────────
+
+  /**
+   * Execute the built query against the database.
+   * @returns Array of result rows.
    */
   run(): any[];
 }
-
-/**
- * SQLite database wrapper class
- */
-declare class Database {
-  /**
-   * @param filename - Database file path (':memory:' for in-memory)
-   */
-  constructor(filename: string);
-}
-
-/**
- * Query builder class (internal implementation)
- */
-declare class QueryBuilder {
-  // Implementation details are handled internally
-}
-
-// Re-export common types
-
-declare class Sqlight implements DatabaseManager {}

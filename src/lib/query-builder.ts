@@ -6,7 +6,7 @@ import { normalizeInsertData } from './normalize-insert-data';
 import type { ColumnBuilder } from './schema/primitives';
 import { generateTableTypes, mapType } from './type-generator';
 import type { SQLITE_TYPES } from '../utils/sqlite.types';
-import type { TableNames, TypeTables } from 'table-types';
+import type { TableNames, TypeTables } from '../table-types';
 export enum Comparison {
   EQUAL = '=',
   NOT_EQUAL = '!=',
@@ -35,37 +35,54 @@ export type QueryPart = {
 interface SchemaOptions {
   exists?: boolean;
 }
-export interface IQueryBuilder {
+
+export interface TableSchemaShape {
+  select: Record<string, any>;
+  insert: Record<string, any>;
+  update: Record<string, any>;
+}
+
+export interface IQueryBuilder<
+  TypeTablesSchema extends Record<keyof TypeTablesSchema, TableSchemaShape> = TypeTables,
+  TableNamesSchema extends keyof TypeTablesSchema & string = keyof TypeTablesSchema & string
+> {
   queryBrute?: string;
   tables: Tables;
-  db?: DatabaseManager;
+  db?: DatabaseManager<TypeTablesSchema, TableNamesSchema>;
   actualQuery: QueryPart[];
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'])[]): this;
-  from(table: string): this;
+  select<T extends TableNamesSchema>(...fields: (keyof TypeTablesSchema[T]['select'] | '*')[]): this;
+  from<T extends TableNamesSchema>(table: T): this;
   where(field: string, value: any): this;
   orWhere(field: string, value: any): this;
   orderBy(field: string, direction: 'ASC' | 'DESC'): this;
   limit(limit: number): this;
-  dropTable(table: string): this;
-  createTable(table: string, fields: { [key: string]: string }): this;
-  insert(table: string, data: Record<string, any>): this;
-  update(table: string, data: Record<string, any>): this;
+  dropTable<T extends TableNamesSchema>(table: T): this;
+  createTable(
+    table: string,
+    fields: { [key: string]: any } | ((schema: Schema) => void),
+    options?: SchemaOptions
+  ): this;
+  insert<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['insert']): this;
+  update<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['update']): this;
   run(): string;
 }
 
-export class QueryBuilder implements IQueryBuilder {
+export class QueryBuilder<
+  TypeTablesSchema extends Record<keyof TypeTablesSchema, TableSchemaShape> = TypeTables,
+  TableNamesSchema extends keyof TypeTablesSchema & string = keyof TypeTablesSchema & string
+> implements IQueryBuilder<TypeTablesSchema, TableNamesSchema> {
   tables: Tables = {};
   queryBrute?: string;
-  db?: DatabaseManager;
+  db?: DatabaseManager<TypeTablesSchema, TableNamesSchema>;
   actualQuery: QueryPart[] = [];
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this {
+  select<T extends TableNamesSchema>(...fields: (keyof TypeTablesSchema[T]['select'] | '*')[]): this {
     this.actualQuery.push({
       query: `SELECT ${(Array.isArray(fields) ? fields.join(', ') : fields) || '*'}`,
       level: QueryLevel.CLAUSE,
     });
     return this;
   }
-  from<T extends TableNames>(table: T): this {
+  from<T extends TableNamesSchema>(table: T): this {
     this.actualQuery.push({ query: `FROM ${table}`, level: QueryLevel.TABLE });
     return this;
   }
@@ -132,7 +149,7 @@ export class QueryBuilder implements IQueryBuilder {
     });
     return this;
   }
-  dropTable<T extends TableNames>(table: T): this {
+  dropTable<T extends TableNamesSchema>(table: T): this {
     this.actualQuery.push({
       query: `DROP TABLE ${table}`,
       level: QueryLevel.TABLE,
@@ -170,22 +187,22 @@ export class QueryBuilder implements IQueryBuilder {
       return acc;
     }, {} as Record<string, ColumnMetadata>);
     console.log(this.tables);
-    generateTableTypes(table, this.tables[table]);
+    generateTableTypes(table, this.tables[table], this.db?.options);
     return this;
     // SELECT * FROM users
   }
-  insert<T extends TableNames>(table: T, data: TypeTables[T]['insert']): this {
+  insert<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['insert']): this {
     const keys = Object.keys(data);
-    const values = Object.values(data);
+    const values = Object.values(data as any);
     this.actualQuery.push({
       query: `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${values.map(normalizeInsertData(this.tables, table, keys)).join(', ')})`,
       level: QueryLevel.CLAUSE,
     });
     return this;
   }
-  update<T extends TableNames>(table: T, data: TypeTables[T]['update']): this {
+  update<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['update']): this {
     this.actualQuery.push({
-      query: `UPDATE ${table} SET ${Object.entries(data)
+      query: `UPDATE ${table} SET ${Object.entries(data as any)
         .map(([key, value]) => `${key} = ${typeof value === 'string' ? `"${value}"` : value}`)
         .join(', ')}`,
       level: QueryLevel.CLAUSE,

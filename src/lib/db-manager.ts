@@ -3,14 +3,22 @@ import { QueryBuilder } from './query-builder';
 import { MetricTimer } from '../utils/metric-timer';
 import type { Hooks } from './hooks';
 import { validateSQLQuery } from './analyze-is-malicious';
-import { Comparison } from './query-builder';
+import { Comparison, type TableSchemaShape } from './query-builder';
 import type { Tables } from './table';
 import type { Schema } from './schema';
-import type { TableNames, TypeTables } from 'table-types';
+import type { TableNames as DefaultTableNames, TypeTables as DefaultTypeTables } from '../table-types';
 
-export class DatabaseManager {
-  private builder: QueryBuilder;
-  private db: Database;
+export interface SqlightOptions {
+  typesOutputFile?: string;
+}
+
+export class DatabaseManager<
+  TypeTablesSchema extends Record<keyof TypeTablesSchema, TableSchemaShape> = DefaultTypeTables,
+  TableNamesSchema extends keyof TypeTablesSchema & string = keyof TypeTablesSchema & string
+> {
+  public builder: QueryBuilder<TypeTablesSchema, TableNamesSchema>;
+  public db: Database;
+  public options?: SqlightOptions;
   hooks: Hooks = {
     afterInsert: [],
     afterUpdate: [],
@@ -20,10 +28,15 @@ export class DatabaseManager {
     afterSelect: [],
   };
 
-  constructor(builder: QueryBuilder, db: Database) {
+  constructor(
+    builder: QueryBuilder<TypeTablesSchema, TableNamesSchema>,
+    db: Database,
+    options?: SqlightOptions
+  ) {
     this.builder = builder;
     this.db = db;
-    this.builder.db = this;
+    this.options = options;
+    this.builder.db = this as any;
   }
 
   static getDb(db: string) {
@@ -34,19 +47,19 @@ export class DatabaseManager {
     this.db.close();
   }
 
-  raw(query: string) {
+  raw<T = any>(query: string): T[] {
     validateSQLQuery(query);
-    return this.db.query(query).all();
+    return this.db.query(query).all() as T[];
   }
 
   // Explicitly defined QueryBuilder methods
 
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this {
+  select<T extends TableNamesSchema>(...fields: (keyof TypeTablesSchema[T]['select'] | '*')[]): this {
     this.builder.select(...fields);
     return this;
   }
 
-  from<T extends TableNames>(table: T): this {
+  from<T extends TableNamesSchema>(table: T): this {
     this.builder.from(table);
     return this;
   }
@@ -78,7 +91,7 @@ export class DatabaseManager {
     return this;
   }
 
-  dropTable<T extends TableNames>(table: T): this {
+  dropTable<T extends TableNamesSchema>(table: T): this {
     const query = this.builder.dropTable(table).run();
     console.log(`Running query: \n ${query}`);
     validateSQLQuery(query);
@@ -89,7 +102,7 @@ export class DatabaseManager {
 
   createTable(
     table: string,
-    fields: { [key: string]: string } | ((schema: Schema) => void),
+    fields: { [key: string]: any } | ((schema: Schema) => void),
     options: { exists?: boolean } = { exists: true }
   ): this {
     const query = this.builder.createTable(table, fields, options).run();
@@ -100,7 +113,7 @@ export class DatabaseManager {
     return this;
   }
 
-  insert<T extends TableNames>(table: T, data: TypeTables[T]['insert']): this {
+  insert<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['insert']): this {
     // Process before insert hooks
     this.builder.insert(table, data);
     const callbacks = this.hooks.beforeInsert.filter((action) => !!action[table]).map((action) => action[table]);
@@ -115,7 +128,7 @@ export class DatabaseManager {
     return this;
   }
 
-  update<T extends TableNames>(table: T, data: TypeTables[T]['update']): this {
+  update<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['update']): this {
     // Process before update hooks
     this.builder.update(table, data);
     const callbacks = this.hooks.beforeUpdate.filter((action) => !!action[table]).map((action) => action[table]);
