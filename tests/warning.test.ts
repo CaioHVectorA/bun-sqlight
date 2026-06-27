@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { Database } from '../src/lib/connect';
+import { Sqlight } from '../src/lib/connect';
 import type { DatabaseManager } from '../src/lib/db-manager';
 import type { QueryBuilder } from '../src/lib/query-builder';
 
@@ -7,7 +7,7 @@ describe('Warning about dangerous queries', () => {
   let db: DatabaseManager;
 
   beforeEach(() => {
-    db = new Database(':memory:') as DatabaseManager;
+    db = new Sqlight(':memory:') as any;
     //@ts-ignore
     db.createTable('users', (t) => {
       t.id(), t.string('name'), t.integer('age');

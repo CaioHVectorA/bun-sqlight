@@ -256,9 +256,14 @@ export class QueryBuilder implements IQueryBuilder {
     const alias1 = aliasesValues[1] ? aliasesValues[1] : '';
     const alias2 = aliasesValues[0] ? aliasesValues[0] : '';
 
+    const aliasVal2 = findAlias(table2, alias2);
+    const aliasStr2 = aliasVal2 ? ` ${aliasVal2}` : '';
+    const aliasVal1 = findAlias(table1, alias1);
+    const aliasStr1 = aliasVal1 ? ` ${aliasVal1}` : '';
+
     if (select && select.query.includes(table2)) {
       this.actualQuery.push({
-        query: `${type} JOIN ${table1}${` ${findAlias(table1, alias1)}`} ON ${findAlias(
+        query: `${type} JOIN ${table1}${aliasStr1} ON ${findAlias(
           table2,
           table2
         )}.${column2} ${comparison} ${findAlias(table1, table1)}.${column1}`,
@@ -267,13 +272,15 @@ export class QueryBuilder implements IQueryBuilder {
       // add alias to the select initial table
       console.log('REACHED HERE!');
       const withFrom = this.actualQuery.findIndex((s) => s.query.includes('FROM') && s.query.includes(table2));
-      if (!withFrom) throw new Error('Alias erroring');
-      this.actualQuery[withFrom].query = this.actualQuery[withFrom].query + findAlias(table2, alias2);
+      if (withFrom === -1) throw new Error('Alias erroring');
+      if (aliasVal2) {
+        this.actualQuery[withFrom].query = this.actualQuery[withFrom].query + ' ' + aliasVal2;
+      }
       return this;
     }
 
     this.actualQuery.push({
-      query: `${type} JOIN ${table2}${` ${findAlias(table2, alias2)}`} ON ${findAlias(table1, table1)}.${column1} ${comparison} ${findAlias(
+      query: `${type} JOIN ${table2}${aliasStr2} ON ${findAlias(table1, table1)}.${column1} ${comparison} ${findAlias(
         table2,
         table2
       )}.${column2}`,
@@ -281,9 +288,11 @@ export class QueryBuilder implements IQueryBuilder {
     });
     console.log('REACHED HERE!');
     const withFrom = this.actualQuery.findIndex((s) => s.query.includes('FROM') && s.query.includes(findRef(table1, table1)));
-    if (!withFrom) throw new Error('Alias erroring');
+    if (withFrom === -1) throw new Error('Alias erroring');
     console.log({ table1, alias1, table2, alias2 });
-    this.actualQuery[withFrom].query = this.actualQuery[withFrom].query + ' ' + findAlias(table1, alias1);
+    if (aliasVal1) {
+      this.actualQuery[withFrom].query = this.actualQuery[withFrom].query + ' ' + aliasVal1;
+    }
     return this;
   }
 }

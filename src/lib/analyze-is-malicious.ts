@@ -63,10 +63,10 @@ function validateSQLQuery(query: string): void {
     }
   }
   // Detect UPDATE or DELETE statements without a WHERE clause
-  const updateDeleteWithoutWhere = /\b(update|delete)\b\s+(?!.*\bwhere\b)/i;
-
-  if (updateDeleteWithoutWhere.test(query)) {
-    throw new Error(`Malicious query detected: UPDATE or DELETE without WHERE clause in query "${query}"`);
+  if (/^\s*(update|delete)\b/i.test(query)) {
+    if (!/\bwhere\b/i.test(query)) {
+      throw new Error(`Malicious query detected: UPDATE or DELETE without WHERE clause in query "${query}"`);
+    }
   }
 }
 

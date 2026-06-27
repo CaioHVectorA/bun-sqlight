@@ -10,12 +10,12 @@
     - [x] Updated_at
   - [X] Add table schema in querybuilder in each table created to work with foreign keys with INFERED types and something like that
   - [X] Add alias!
-  - [ ] Add, refine and test the API for the schema builder
+  - [X] Add, refine and test the API for the schema builder
   - [ ] ~~Add a CLI to generate the schema~~
   - [ ] ~~Setup a migration architecture~~
   - [ ] ~~Add, refine and test the API for the CLI migration~~
-- [ ] Block malicious queries
-- [ ] Relationship support
+- [x] Block malicious queries
+- [x] Relationship support
 - [ ] Add a migration system
 - [ ] Add a transaction support
 - [ ] Add a query logging system

@@ -166,9 +166,11 @@ export class Schema implements TableSchemaHandles {
     const schema = this.mainQuerybuilder.tables[refTable];
     if (!schema) throw new Error('Table not found');
     const type = schema[refColumn];
+    if (!type) throw new Error(`Column ${refColumn} not found on table ${refTable}`);
+    const sqlType = type.sqlType;
     const onDelete = options?.onDelete ? ` ON DELETE ${options.onDelete}` : '';
     const onUpdate = options?.onUpdate ? ` ON UPDATE ${options.onUpdate}` : '';
-    const query = `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${refTable}(${refColumn})${onDelete}${onUpdate}`;
+    const query = `${name} ${sqlType}, FOREIGN KEY (${name}) REFERENCES ${refTable}(${refColumn})${onDelete}${onUpdate}`;
     this.queryBuilder.actualQuery.push({ query, level: QueryLevel.WHERE });
   }
 }
