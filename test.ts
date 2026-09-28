@@ -1,4 +1,4 @@
-import { Sqlight } from './dist/src';
+import { Sqlight } from './dist/index.js';
 const db = new Sqlight();
 db.createTable('users', {
   id: 'INTEGER PRIMARY KEY',

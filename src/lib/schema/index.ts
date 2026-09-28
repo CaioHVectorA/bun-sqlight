@@ -48,13 +48,17 @@ export class Schema implements TableSchemaHandles {
   }
 
   // Método auxiliar para reduzir a repetição na criação de colunas
-  private addColumn(name: string, type: SQLITE_TYPES, options?: Options<any>): void {
+  private addColumn(name: string, type: SQLITE_TYPES, options?: Options<any> & { omitNullable?: boolean }): void {
     const defaultText =
       options?.default !== undefined
         ? `DEFAULT ${['TEXT', 'DATE', 'DATETIME'].includes(type) ? `'${options.default}'` : options.default}`
         : '';
     const uniqueText = options?.unique ? 'UNIQUE' : '';
-    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
+    const nullableText = options?.omitNullable
+      ? ''
+      : options?.nullable
+      ? 'NULL'
+      : 'NOT NULL';
     const query = `${name} ${type} ${defaultText} ${uniqueText} ${nullableText}`.replace(/\s+/g, ' ').trim();
     this.queryBuilder.actualQuery.push({ query, level: QueryLevel.TABLE });
     const tsType = mapType(type);
@@ -138,8 +142,8 @@ export class Schema implements TableSchemaHandles {
   }
 
   timestamps(): void {
-    this.addColumn('created_at', 'TIMESTAMP', { default: 'CURRENT_TIMESTAMP', nullable: false });
-    this.addColumn('updated_at', 'TIMESTAMP', { default: 'CURRENT_TIMESTAMP', nullable: false });
+    this.addColumn('created_at', 'TIMESTAMP', { default: 'CURRENT_TIMESTAMP', omitNullable: true } as any);
+    this.addColumn('updated_at', 'TIMESTAMP', { default: 'CURRENT_TIMESTAMP', omitNullable: true } as any);
     if (!this.queryBuilder.db) return;
     this.queryBuilder.db.hooks.beforeUpdate.push({
       [this.table]: (queries) => {
@@ -165,10 +169,11 @@ export class Schema implements TableSchemaHandles {
     const [refTable, refColumn] = reference.split('.');
     const schema = this.mainQuerybuilder.tables[refTable];
     if (!schema) throw new Error('Table not found');
-    const type = schema[refColumn];
+    const typeMeta = schema[refColumn];
+    const sqlType = typeof typeMeta === 'string' ? typeMeta : typeMeta?.sqlType || 'INTEGER';
     const onDelete = options?.onDelete ? ` ON DELETE ${options.onDelete}` : '';
     const onUpdate = options?.onUpdate ? ` ON UPDATE ${options.onUpdate}` : '';
-    const query = `${name} ${type}, FOREIGN KEY (${name}) REFERENCES ${refTable}(${refColumn})${onDelete}${onUpdate}`;
+    const query = `${name} ${sqlType}, FOREIGN KEY (${name}) REFERENCES ${refTable}(${refColumn})${onDelete}${onUpdate}`;
     this.queryBuilder.actualQuery.push({ query, level: QueryLevel.WHERE });
   }
 }

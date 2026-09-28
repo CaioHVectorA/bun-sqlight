@@ -1,5 +1,6 @@
 export type SQLITE_TYPES =
   | 'INTEGER' // Signed integers
+  | 'INT' // Signed integers
   | 'TEXT' // Text strings
   | 'FLOAT' // Floating point numbers
   | 'REAL' // Floating point numbers
@@ -11,6 +12,8 @@ export type SQLITE_TYPES =
   | 'TIME' // Time (stored as TEXT or INTEGER)
   | 'UUID' // Universally Unique Identifier (stored as TEXT)
   | `VARCHAR(${string})` // Variable length text
+  | 'VARCHAR'
+  | `CHAR(${string})`
   | 'DECIMAL' // Exact decimal numbers
   | 'DOUBLE' // Double precision floating point
   | 'BIGINT' // Large integers
