@@ -2,7 +2,9 @@
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
-    "baseUrl": "./src",
+    "paths": {
+      "*": ["./src/*"]
+    },
     "module": "ESNext",
     "moduleDetection": "force",
     "allowJs": true,
@@ -14,6 +16,7 @@
     "useDefineForClassFields": true, 
     "noEmit": false, 
 
+    "types": ["bun"],
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,

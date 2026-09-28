@@ -1,5 +1,4 @@
 // sqlight.d.ts
-import Tables from './generated/index';
 /**
  * SQLight Library Type Declarations
  *
@@ -65,64 +64,48 @@ interface ColumnMetadata {
 }
 
 /**
- * Type mapping for table structures and operations.
- * @template T - Table name type.
+ * Type mapping for generated table structures.
  */
-interface TypeTables<T extends string = string> {
-  [key: string]: {
-    /**
-     * Data structure for SELECT operations
-     */
-    select: Record<string, any>;
-    /**
-     * Data structure for INSERT operations
-     */
-    insert: Record<string, any>;
-    /**
-     * Data structure for UPDATE operations
-     */
-    update: Record<string, any>;
-  };
-}
+export type TypeTables = Omit<typeof import('./generated/index').default, 'prototype'>;
 
 /**
  * Union type of available table names.
  */
-type TableNames = keyof Tables;
+export type TableNames = keyof TypeTables extends never ? string : keyof TypeTables;
 
 /**
  * Main database manager class providing query building and execution capabilities.
  */
-declare class DatabaseManager {
+export declare class DatabaseManager {
   /**
    * @param builder - Query builder instance
    * @param db - SQLite database instance
    */
-  constructor(builder: QueryBuilder, db: Database);
+  constructor(builder?: QueryBuilder, db?: any);
 
   /**
    * Hooks registry for database operations
    */
-  private hooks: Hooks;
+  hooks: Hooks;
 
   /**
    * Execute raw SQL query
    * @param query - Raw SQL string
    * @returns Query results
    */
-  raw<T>(query: string): T[];
+  raw<T = any>(query: string): T[];
 
   /**
    * SELECT query builder
    * @param fields - Fields to select ('*' for all)
    */
-  select<T extends TableNames>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this;
+  select<T extends TableNames = string>(...fields: (keyof TypeTables[T]['select'] | '*')[]): this;
 
   /**
    * FROM clause builder
    * @param table - Table name to query from
    */
-  from<T extends TableNames>(table: T): this;
+  from<T extends TableNames = string>(table: T): this;
 
   /**
    * WHERE condition builder
@@ -133,29 +116,84 @@ declare class DatabaseManager {
   where(field: string, valueOrComparison: any, value?: any): this;
 
   /**
+   * OR WHERE condition builder
+   */
+  orWhere(field: string, valueOrComparison: any, value?: any): this;
+
+  /**
+   * ORDER BY builder
+   */
+  orderBy(field: string, direction: 'ASC' | 'DESC'): this;
+
+  /**
+   * LIMIT builder
+   */
+  limit(limit: number): this;
+
+  /**
+   * OFFSET builder
+   */
+  offset(offset: number): this;
+
+  /**
+   * CREATE TABLE builder
+   */
+  createTable(table: string, fields: any, options?: { exists?: boolean }): this;
+
+  /**
+   * DROP TABLE builder
+   */
+  dropTable(table: string): this;
+
+  /**
+   * INSERT query builder
+   */
+  insert<T extends TableNames = string>(table: T, data: any): this;
+
+  /**
+   * UPDATE query builder
+   */
+  update<T extends TableNames = string>(table: T, data: any): this;
+
+  /**
+   * DELETE query builder
+   */
+  delete(table: string): this;
+
+  /**
+   * Close database
+   */
+  close(): void;
+
+  /**
    * Execute built query
    * @returns Query results
    */
-  run(): any[];
-}
-
-/**
- * SQLite database wrapper class
- */
-declare class Database {
-  /**
-   * @param filename - Database file path (':memory:' for in-memory)
-   */
-  constructor(filename: string);
+  run<T = any>(): T[];
 }
 
 /**
  * Query builder class (internal implementation)
  */
-declare class QueryBuilder {
-  // Implementation details are handled internally
+export declare class QueryBuilder {
+  select(...fields: any[]): this;
+  from(table: string): this;
+  where(field: string, valueOrComparison: any, value?: any): this;
+  orWhere(field: string, valueOrComparison: any, value?: any): this;
+  orderBy(field: string, direction: 'ASC' | 'DESC'): this;
+  limit(limit: number): this;
+  offset(offset: number): this;
+  insert(table: string, data: Record<string, any>): this;
+  update(table: string, data: Record<string, any>): this;
+  delete(table: string): this;
+  run(): string;
 }
 
-// Re-export common types
+export declare class Sqlight extends DatabaseManager {
+  constructor(filename?: string);
+}
 
-declare class Sqlight implements DatabaseManager {}
+export declare class BunSqlight extends Sqlight {}
+export declare class Database extends Sqlight {}
+
+export default Sqlight;

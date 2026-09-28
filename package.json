@@ -1,7 +1,7 @@
 {
   "name": "bun-sqligth",
   "module": "index.ts",
-  "main": "dist/out.js",
+  "main": "dist/index.js",
   "version": "1.0.0",
   "types": "src/sqlight.d.ts",
   "type": "module",

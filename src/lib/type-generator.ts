@@ -5,39 +5,53 @@ import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
 export function mapType(sqlType: SQLITE_TYPES): string {
-  if (sqlType.startsWith('VARCHAR')) {
+  if (!sqlType) return 'any';
+  if (sqlType.startsWith('VARCHAR') || sqlType.startsWith('CHAR')) {
     return 'string';
   }
   switch (sqlType) {
     case 'INTEGER':
+    case 'INT':
+    case 'BIGINT':
+    case 'FLOAT':
+    case 'REAL':
+    case 'DOUBLE':
+    case 'DECIMAL':
+    case 'NUMERIC':
       return 'number';
     case 'TEXT':
+    case 'CHAR':
     case 'DATE':
     case 'DATETIME':
+    case 'TIME':
     case 'TIMESTAMP':
     case 'UUID':
       return 'string';
     case 'BOOLEAN':
       return 'boolean';
-    case 'FLOAT':
-      return 'number';
+    case 'BLOB':
+      return 'Buffer | Uint8Array';
+    case 'NULL':
+      return 'null';
     default:
       return 'any';
   }
 }
 
 export function generateTableTypes(tableName: string, columns: Record<string, ColumnMetadata>) {
-  console.log({ tableName, columns });
-  const selectFields = Object.entries(columns)
-    .map(([name, meta]) => `${name}: ${meta.tsType}${meta.nullable ? ' | null' : ''}`)
+  if (!columns) return;
+  const entries = Object.entries(columns);
+
+  const selectFields = entries
+    .map(([name, meta]) => `${name}: ${meta.tsType || mapType(meta.sqlType as SQLITE_TYPES)}${meta.nullable ? ' | null' : ''}`)
     .join('\n  ');
 
-  const insertFields = Object.entries(columns)
+  const insertFields = entries
     .filter(([_, meta]) => !meta.isPrimary) // Ignora PK auto gerada
-    .map(([name, meta]) => `${name}${meta.nullable || meta.hasDefault ? '?' : ''}: ${meta.tsType}${meta.nullable ? ' | null' : ''}`)
+    .map(([name, meta]) => `${name}${meta.nullable || meta.hasDefault ? '?' : ''}: ${meta.tsType || mapType(meta.sqlType as SQLITE_TYPES)}${meta.nullable ? ' | null' : ''}`)
     .join('\n  ');
 
-  const updateType = `Partial<Omit<${tableName}Insert, 'id'>> & { id: number }`;
+  const updateType = `Partial<${tableName}Insert>`;
 
   const typeContent = `
 // Auto-generated types for ${tableName}
@@ -51,55 +65,33 @@ export interface ${tableName}Insert {
 
 export type ${tableName}Update = ${updateType};
   `;
-  const dir = dirname(`src/generated/${tableName}.types.ts`);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  console.log({ dirname: dirname(`src/generated/${tableName}.types.ts`), _dirname: __dirname + `src/generated/${tableName}.types.ts` });
-  writeFileSync(`src/generated/${tableName}.types.ts`, typeContent);
-  // now generated/index should have a map of all table names.
-  // some thing like:
-  // ```ts
-  // import { type userSelect, type userInsert, type userUpdate } from './user.types';
-  // import { type logsSelect, type logsInsert, type logsUpdate } from './logs.types';
-  // export type TableTypes = {
-  // user: {
-  //  select: userSelect,
-  //  insert: userInsert,
-  //  update: userUpdate,
-  // },
-  // logs: {
-  //  select: logsSelect,
-  //  insert: logsInsert,
-  //  update: logsUpdate,
-  // },
-  // //$___
-  // }
-  // ```
-  // We can import them in our query builder
-  // And the code should be incremental, so we can add new tables without breaking the existing ones
 
-  const indexPath = 'src/generated/index.ts';
+  const generatedDir = existsSync('src') ? 'src/generated' : 'generated';
+  if (!existsSync(generatedDir)) {
+    mkdirSync(generatedDir, { recursive: true });
+  }
+
+  const tableFilePath = `${generatedDir}/${tableName}.types.ts`;
+  writeFileSync(tableFilePath, typeContent);
+
+  const indexPath = `${generatedDir}/index.ts`;
   const replaceLabel = '//$___';
   if (!existsSync(indexPath)) {
     writeFileSync(
       indexPath,
-      `
-      // Auto-generated index for table types
-      export default class TableTypes {\n\n      //${replaceLabel}\n    }
-      `
+      `// Auto-generated index for table types\nexport default class TableTypes {\n  ${replaceLabel}\n}\n`
     );
   }
   let indexContent = readFileSync(indexPath, 'utf-8');
   const importStatement = `import { type ${tableName}Select, type ${tableName}Insert, type ${tableName}Update } from './${tableName}.types';`;
-  const tableTypeEntry = `  \nstatic ${tableName}: {\n    select: ${tableName}Select,\n    insert: ${tableName}Insert,\n    update: ${tableName}Update,\n  }`;
+  const tableTypeEntry = `  static ${tableName}: {\n    select: ${tableName}Select;\n    insert: ${tableName}Insert;\n    update: ${tableName}Update;\n  };`;
 
   if (!indexContent.includes(importStatement)) {
     indexContent = `${importStatement}\n${indexContent}`;
   }
 
-  if (!indexContent.includes(tableTypeEntry)) {
-    indexContent = indexContent.replace(replaceLabel, `${tableTypeEntry}\n${replaceLabel}`);
+  if (!indexContent.includes(`static ${tableName}:`)) {
+    indexContent = indexContent.replace(replaceLabel, `${tableTypeEntry}\n  ${replaceLabel}`);
   }
 
   writeFileSync(indexPath, indexContent);
