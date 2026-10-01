@@ -12,5 +12,5 @@ export interface usersInsert {
   age: number
 }
 
-export type usersUpdate = Partial<Omit<usersInsert, 'id'>> & { id: number };
+export type usersUpdate = Partial<usersInsert>;
   

@@ -1,3 +1,9 @@
+import { SqlightSecurityError } from './errors';
+
+export interface SQLValidationOptions {
+  allowUnsafeWhere?: boolean;
+}
+
 /**
  * Validates an SQL query and throws an error if malicious patterns are detected.
  *
@@ -16,9 +22,10 @@
  * Therefore, queries like "DROP TABLE users" are allowed as long as they do not contain semicolons.
  *
  * @param {string} query - The SQL query to be validated.
- * @throws {Error} If a malicious pattern is detected.
+ * @param {SQLValidationOptions} [options] - Validation options.
+ * @throws {SqlightSecurityError} If a malicious pattern is detected.
  */
-function validateSQLQuery(query: string): void {
+function validateSQLQuery(query: string, options?: SQLValidationOptions): void {
   // Scan for semicolons outside of literals
   let inSingleQuote = false;
   let inDoubleQuote = false;
@@ -40,7 +47,7 @@ function validateSQLQuery(query: string): void {
 
     // If a semicolon is found outside any literal, throw an error
     if (char === ';' && !inSingleQuote && !inDoubleQuote) {
-      throw new Error(`Malicious query detected: semicolon found in query "${query}"`);
+      throw new SqlightSecurityError(`Malicious query detected: semicolon found in query "${query}"`, ';', query);
     }
   }
 
@@ -59,13 +66,14 @@ function validateSQLQuery(query: string): void {
 
   for (const pattern of maliciousPatterns) {
     if (pattern.test(query)) {
-      throw new Error(`Malicious query detected: pattern '${pattern}' found in query "${query}"`);
+      throw new SqlightSecurityError(`Malicious query detected: pattern '${pattern}' found in query "${query}"`, pattern.toString(), query);
     }
   }
-  // Detect UPDATE or DELETE statements without a WHERE clause
-  if (/^\s*(update|delete)\b/i.test(query)) {
+
+  // Detect UPDATE or DELETE statements without a WHERE clause (unless bypassed)
+  if (!options?.allowUnsafeWhere && /^\s*(update|delete)\b/i.test(query)) {
     if (!/\bwhere\b/i.test(query)) {
-      throw new Error(`Malicious query detected: UPDATE or DELETE without WHERE clause in query "${query}"`);
+      throw new SqlightSecurityError(`Malicious query detected: UPDATE or DELETE without WHERE clause in query "${query}"`, 'MISSING_WHERE', query);
     }
   }
 }

@@ -1,24 +1,30 @@
 # bun-sqlight Documentation
 
-`bun-sqlight` is a zero-dependency, lightweight, and type-safe SQLite abstraction layer built specifically for the Bun JavaScript runtime.
+`bun-sqlight` is a zero-dependency, lightweight, and type-safe SQLite abstraction layer built specifically for the Bun JavaScript runtime. It sits in the sweet spot between an ORM and a Query Builder — offering the fluent flexibility of SQL building alongside active record models, transactions, migrations, relations hydration, and compile-time safety.
 
 ---
 
 ## Table of Contents
 1. [Getting Started](#getting-started)
-2. [Connection API](#connection-api)
-3. [Query Builder API](#query-builder-api)
+2. [Connection API & Options](#connection-api--options)
+3. [ORM / Model API (`db.table`)](#orm--model-api-dbtable)
+4. [Query Builder API](#query-builder-api)
    - [SELECT Queries](#select-queries)
+   - [WHERE Clauses & Filters](#where-clauses--filters)
    - [INSERT Queries](#insert-queries)
    - [UPDATE Queries](#update-queries)
    - [DELETE Queries](#delete-queries)
-   - [JOIN Operations & Table Aliases](#join-operations--table-aliases)
-4. [Schema Builder API](#schema-builder-api)
+   - [JOIN Operations & Aliases](#join-operations--aliases)
+   - [One-to-Many Hydration (`asKey`)](#one-to-many-hydration-askey)
+5. [Transactions](#transactions)
+6. [Migrations System & CLI](#migrations-system--cli)
+7. [Schema Builder API](#schema-builder-api)
    - [Column Types](#column-types)
    - [Timestamps & UUID Auto-Hooks](#timestamps--uuid-auto-hooks)
    - [Foreign Keys & Referential Integrity](#foreign-keys--referential-integrity)
-5. [Security & Query Protection](#security--query-protection)
-6. [Type Generation](#type-generation)
+8. [Security, SafeMode & Error Handling](#security-safemode--error-handling)
+9. [Query Logging & Metrics](#query-logging--metrics)
+10. [Type Generation](#type-generation)
 
 ---
 
@@ -32,219 +38,349 @@ $ bun add bun-sqlight
 
 ---
 
-## Connection API
+## Connection API & Options
 
-To start using `bun-sqlight`, import the `Sqlight` class and instantiate it. By default, it connects to an in-memory SQLite database if no path is provided.
+Import `Sqlight` (or `BunSqlight`) and instantiate it. By default, it connects to an in-memory database (`:memory:`).
 
 ```ts
-import { Sqlight } from 'bun-sqlight';
+import { Sqlight, BunSqlight } from 'bun-sqlight';
 
-// Connect to an in-memory database
+// In-memory database
 const db = new Sqlight();
 
-// Or connect to a file-based SQLite database
-const db = new Sqlight('production.db');
+// File-based database with logging and safeMode
+const db = new Sqlight('production.db', {
+  safeMode: true, // Prevents destructive queries without WHERE (default: true)
+  logger: (log) => console.log(`[${log.type}] (${log.durationMs}ms) ${log.query}`),
+});
 
-// Run raw queries directly (validated for security constraints)
-const users = db.raw("SELECT * FROM users WHERE age > 18");
+// Run raw queries directly (validated against injection)
+const users = db.raw("SELECT * FROM users WHERE age > ?", [18]);
 
-// Close the connection
+// Close connection
 db.close();
+```
+
+---
+
+## ORM / Model API (`db.table`)
+
+When you want clean, zero-boilerplate operations without manually assembling SQL strings, use `db.table(tableName)` or `db.model(tableName)`:
+
+```ts
+const users = db.table('users');
+
+// Find by ID
+const user = users.find(1); // or users.findById(1)
+
+// Find one by criteria
+const alice = users.findOne({ name: 'Alice' }); // or users.findFirst({ age: 25 })
+
+// Find many with criteria, ordering, and pagination
+const activeUsers = users.findMany({
+  where: { active: 1 },
+  orderBy: ['created_at', 'DESC'],
+  limit: 10,
+  offset: 0,
+});
+
+// Create (returns the inserted record with generated ID)
+const newUser = users.create({ name: 'Charlie', age: 32 });
+
+// Create multiple records
+users.createMany([
+  { name: 'Diana', age: 28 },
+  { name: 'Evan', age: 24 },
+]);
+
+// Update by ID (returns updated record)
+const updated = users.update(1, { age: 33 });
+
+// Update by criteria
+const updatedCount = users.updateWhere({ status: 'pending' }, { status: 'verified' });
+
+// Delete by ID
+users.delete(1);
+
+// Delete by criteria
+users.deleteWhere({ status: 'inactive' });
+
+// Aggregate helpers
+const count = users.count({ active: 1 });
+const exists = users.exists({ email: 'user@example.com' });
+
+// Drop down to query builder whenever needed
+const qb = users.query().select('name').where('age', '>', 30);
 ```
 
 ---
 
 ## Query Builder API
 
-`bun-sqlight` provides a chainable builder interface to transform your JavaScript/TypeScript API calls into structured SQL strings and execute them. 
+`bun-sqlight` provides a chainable builder interface to transform your JavaScript/TypeScript API calls into structured SQL strings.
 
-Always execute a query by appending `.run()` at the end of the query chain.
+Execute a query by appending `.run()` at the end of the query chain.
 
 ### SELECT Queries
-
-Retrieve data using chainable `.select()`, `.from()`, `.where()`, `.orWhere()`, `.orderBy()`, `.limit()`, and `.offset()` calls.
 
 ```ts
 // Simple SELECT
 const allUsers = db.select('*').from('users').run();
 
-// SELECT with WHERE constraints
-const john = db.select('id', 'name')
-  .from('users')
-  .where('name', 'John')
-  .run();
+// Support both select('a', 'b') and select(['a', 'b'])
+const partial = db.select('id', 'name').from('users').run();
 
-// Using custom comparisons (=, !=, >, <, >=, <=)
-const activeUsers = db.select('*')
-  .from('users')
-  .where('age', '>=', 18)
-  .where('status', '!=', 'inactive')
-  .run();
+// Calling from() first works identically:
+const users = db.from('users').select('name', 'email').run();
 
-// Combined WHERE / OR WHERE
-const matches = db.select('*')
-  .from('users')
-  .where('role', 'admin')
-  .orWhere('name', 'SuperUser')
-  .run();
+// Single row shortcut:
+const firstUser = db.select('*').from('users').first(); // or .get()
 
-// Ordering, Limit & Offset
-const userPage = db.select('*')
-  .from('users')
-  .orderBy('created_at', 'DESC')
-  .limit(10)
-  .offset(20)
-  .run();
+// Count helper
+const total = db.from('users').count();
+```
+
+### WHERE Clauses & Filters
+
+```ts
+// Simple WHERE
+db.select('*').from('users').where('id', 1).run();
+
+// Object syntax:
+db.select('*').from('users').where({ role: 'admin', active: 1 }).run();
+
+// Comparison operators (=, !=, >, <, >=, <=)
+db.select('*').from('users').where('age', '>=', 18).run();
+
+// Combining with OR
+db.select('*').from('users').where('role', 'admin').orWhere('role', 'owner').run();
+
+// IN lists
+db.select('*').from('users').whereIn('id', [1, 2, 3]).run();
+
+// NULL checks
+db.select('*').from('users').whereNull('deleted_at').run();
+db.select('*').from('users').whereNotNull('email').run();
 ```
 
 ### INSERT Queries
 
-Insert records by passing a table name and a flat object representing column-value pairs.
-
 ```ts
-// Insert record
-db.insert('users', {
-  name: 'John Doe',
-  email: 'john@example.com'
-}).run();
+// Single row
+db.insert('users', { name: 'Alice', age: 25 }).run();
 
-// Dates inside Date objects are automatically parsed and formatted:
-db.insert('events', {
-  title: 'Meeting',
-  event_date: new Date('2026-06-27T12:00:00Z') // automatically converted to SQLite format
-}).run();
+// Multiple rows
+db.insert('users', [
+  { name: 'Bob', age: 30 },
+  { name: 'Charlie', age: 35 },
+]).run();
 ```
 
 ### UPDATE Queries
 
-Update records using `.update()` chained with a `.where()` constraint.
-
-> [!WARNING]
-> Running an `.update()` query without a `.where()` constraint will throw a security exception.
-
 ```ts
-// Safe UPDATE
-db.update('users', { name: 'Jane Doe' })
-  .where('id', 1)
-  .run();
+db.update('users', { age: 26 }).where('id', 1).run();
 ```
 
 ### DELETE Queries
 
-Delete records using `.delete()` chained with a `.where()` constraint.
-
-> [!WARNING]
-> Running a `.delete()` query without a `.where()` constraint will throw a security exception.
-
 ```ts
-// Safe DELETE
-db.delete('users')
-  .where('id', 1)
-  .run();
+db.delete('users').where('id', 1).run();
 ```
 
-### JOIN Operations & Table Aliases
-
-Perform joins with custom comparisons, join types (`INNER`, `LEFT`, `RIGHT`, `FULL`), and table aliases.
+### JOIN Operations & Aliases
 
 ```ts
-// INNER JOIN (default)
-const results = db.select('*')
+// INNER JOIN
+db.select('*')
   .from('users')
   .join('orders.user_id', 'users.id')
   .run();
 
-// JOIN with aliases and custom type
-const results = db.select('U.name', 'P.price')
+// JOIN with aliases and custom comparison
+db.select('*')
   .from('users')
-  .join('products.user_id', 'users.id', {
+  .join('orders.user_id', 'users.id', {
     type: 'LEFT',
-    alias: { users: 'U', products: 'P' }
+    comparison: '=',
+    alias: { users: 'U', orders: 'O' },
   })
   .run();
+```
+
+### One-to-Many Hydration (`asKey`)
+
+Standard SQL joins flatten records and duplicate parent columns. `bun-sqlight` includes relational hydration using `asKey`:
+
+```ts
+const usersWithOrders = db.select('*')
+  .from('users')
+  .join('orders.user_id', 'users.id', { asKey: 'orders', type: 'LEFT' })
+  .run();
+
+// Output:
+// [
+//   {
+//     id: 1,
+//     name: 'Alice',
+//     orders: [
+//       { id: 10, user_id: 1, product: 'Book' },
+//       { id: 11, user_id: 1, product: 'Pen' }
+//     ]
+//   },
+//   {
+//     id: 2,
+//     name: 'Bob',
+//     orders: []
+//   }
+// ]
+```
+
+---
+
+## Transactions
+
+Transactions guarantee ACID compliance. If any error is thrown inside a transaction block, `ROLLBACK` is performed automatically:
+
+```ts
+// Automatic transaction
+db.transaction((trx) => {
+  trx.table('accounts').update(1, { balance: 80 });
+  trx.table('accounts').update(2, { balance: 70 });
+});
+
+// Async transaction
+await db.transaction(async (trx) => {
+  await doAsyncWork();
+  trx.table('accounts').update(1, { balance: 50 });
+});
+
+// Manual transaction
+const trx = db.beginTransaction();
+try {
+  db.table('accounts').update(1, { balance: 300 });
+  trx.commit();
+} catch (err) {
+  trx.rollback();
+}
+```
+
+---
+
+## Migrations System & CLI
+
+Track database evolution across files with automatic batch tracking via `_sqlight_migrations`.
+
+### Migration File Format
+
+```ts
+// migrations/001_create_users.ts
+import type { DatabaseManager } from 'bun-sqlight';
+
+export async function up(db: DatabaseManager) {
+  db.createTable('users', (t) => {
+    t.id();
+    t.string('name');
+    t.string('email', { unique: true });
+    t.timestamps();
+  });
+}
+
+export async function down(db: DatabaseManager) {
+  db.dropTable('users');
+}
+```
+
+### Programmatic API
+
+```ts
+// Apply pending migrations
+await db.migrate.up();
+
+// Rollback latest batch
+await db.migrate.rollback();
+
+// Status
+const status = await db.migrate.status();
+
+// Generate boilerplate file
+db.migrate.create('add_posts_table');
+```
+
+### CLI Commands
+
+```bash
+# Apply pending migrations
+$ bun-sqlight migrate [migrations-dir]
+
+# Rollback last migration batch
+$ bun-sqlight migrate:rollback [migrations-dir]
+
+# View status of migrations
+$ bun-sqlight migrate:status [migrations-dir]
+
+# Generate a new timestamped migration
+$ bun-sqlight migrate:create <name> [dir]
+
+# Generate TypeScript declarations from schema file
+$ bun-sqlight generate <schema-file> [output-file]
 ```
 
 ---
 
 ## Schema Builder API
 
-You can create and drop tables using a callback interface.
+Define database tables using a fluent callback or an object mapping.
 
 ```ts
-// Create table structure
 db.createTable('users', (table) => {
-  table.id(); // INTEGER PRIMARY KEY AUTOINCREMENT
-  table.string('name');
-  table.string('email', { unique: true });
-  table.timestamps(); // adds created_at and updated_at TIMESTAMP
-});
-
-// Drop table
-db.dropTable('users');
-```
-
-### Column Types
-
-Supported column types inside the callback include:
-
-- `table.id(name?)`: Defines an autoincrementing integer primary key column. Defaults to name `'id'`.
-- `table.uuid(name?)`: Defines a UUID primary key column (string-based) that generates UUIDs on the fly.
-- `table.string(name, options?)`: Text column.
-- `table.integer(name, options?)`: Integer numeric column.
-- `table.boolean(name, options?)`: Boolean representation (stored as `1` or `0`).
-- `table.float(name, options?)`: Floating-point numeric column.
-- `table.date(name, options?)`: Date column (converts Javascript Date objects to `YYYY-MM-DD`).
-- `table.datetime(name, options?)`: Datetime column (converts Javascript Date objects to `YYYY-MM-DD HH:MM:SS.SSS`).
-- `table.timestamps()`: Automatically generates `created_at` and `updated_at` timestamp columns.
-
-### Column Options
-
-Columns support the following constraints:
-
-```ts
-table.string('name', {
-  default: 'John Doe', // default value
-  unique: true,        // unique index constraint
-  nullable: true       // specifies if column can be NULL (defaults to NOT NULL)
-});
-```
-
-### Timestamps & UUID Auto-Hooks
-
-`bun-sqlight` implements internal hooks to automate field metadata:
-- **UUID Generation**: When a table is declared with `table.uuid()`, a `beforeInsert` hook is registered to automatically populate the UUID using `crypto.randomUUID()` upon record insertions.
-- **Auto-Timestamps**: When `table.timestamps()` is used, a `beforeUpdate` hook is registered to automatically update `updated_at` with the `CURRENT_TIMESTAMP` value during update operations.
-
-### Foreign Keys & Referential Integrity
-
-You can define referential constraints using `.foreign(columnName, referencedColumn, options)`:
-
-```ts
-db.createTable('orders', (table) => {
-  table.id();
-  table.string('product');
-  // Define foreign key constraint users_fk.id with cascade behaviors
-  table.foreign('user_id', 'users_fk.id', {
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE'
-  });
+  table.id();                     // autoincrement integer primary key
+  table.uuid('uuid');             // UUID primary key with auto-generation hook
+  table.string('name');           // TEXT
+  table.integer('age');          // INTEGER
+  table.boolean('is_active');     // BOOLEAN (0/1)
+  table.float('rating');          // REAL
+  table.date('birthday');         // DATE (YYYY-MM-DD)
+  table.datetime('last_login');   // DATETIME
+  table.timestamps();             // created_at and updated_at with auto-update
+  table.foreign('team_id', 'teams.id', { onDelete: 'CASCADE' });
 });
 ```
 
 ---
 
-## Security & Query Protection
+## Security, SafeMode & Error Handling
 
-`bun-sqlight` incorporates strict compile-time SQL structure sanitization in `validateSQLQuery` to prevent malicious database manipulations:
-- Blocks query chaining (multiple commands using unquoted semicolons).
-- Blocks inline SQL comments (`--`, `#`, `/*`) that attempt to hide parts of query structures.
-- Detects SQL injection tautologies (e.g. `OR 1=1`).
-- Identifies and rejects unsafe `UNION` structures.
-- Prevents database administrative execution functions (e.g. `exec`, `sp_executesql`).
-- **Enforces Safety Restrictions**: Strictly raises errors if an `UPDATE` or `DELETE` statement is issued without a corresponding `WHERE` clause.
+`bun-sqlight` enforces strict protection at both compile-time and run-time:
+- **Injection Protection**: Detects comments (`--`, `#`, `/*`), tautologies (`OR 1=1`), and dynamic calls (`sp_executesql`).
+- **Safe Mode**: Throws `SqlightSecurityError` if `UPDATE` or `DELETE` is called without a `WHERE` clause.
+- **Explicit Override**: Use `.allowAll()` to bypass safeMode for mass updates or truncations:
+  ```ts
+  db.allowAll().delete('users').run();
+  ```
+- **Error Hierarchy**:
+  - `SqlightError` (base)
+  - `SqlightQueryError`
+  - `SqlightSecurityError`
+  - `SqlightValidationError`
+  - `SqlightMigrationError`
+
+---
+
+## Query Logging & Metrics
+
+Log queries, execution times, and timestamps:
+
+```ts
+const db = new Sqlight('app.db', {
+  logger: (log) => {
+    console.log(`[Sqlight] (${log.durationMs.toFixed(2)}ms) [${log.type}] ${log.query}`);
+  },
+});
+```
 
 ---
 
 ## Type Generation
 
-When you use the schema builder (`db.createTable`), `bun-sqlight` automatically reads the structure definitions and generates dynamic TypeScript typings inside the `src/generated/` folder. This gives you automatic intellisense and type-safety mapping queries back to interface variables!
+Run `bun-sqlight generate <schema-file>` or define tables in code to generate TypeScript types inside `src/generated/`. Enjoy complete IntelliSense across your queries!

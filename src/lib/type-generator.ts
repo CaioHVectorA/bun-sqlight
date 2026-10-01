@@ -42,7 +42,7 @@ function generateSingleFileTypes(
 
   const selectInterface = `export interface ${tableName}Select {\n${selectFields}\n}`;
   const insertInterface = `export interface ${tableName}Insert {\n${insertFields}\n}`;
-  const updateType = `export type ${tableName}Update = Partial<Omit<${tableName}Insert, 'id'>> & { id: number };`;
+  const updateType = `export type ${tableName}Update = Partial<${tableName}Insert>;`;
 
   const newTableBlock = `// --- Table: ${tableName} Start ---
 ${selectInterface}
@@ -103,7 +103,6 @@ export function generateTableTypes(
   columns: Record<string, ColumnMetadata>,
   options?: { typesOutputFile?: string }
 ) {
-  console.log({ tableName, columns });
   const selectFields = Object.entries(columns)
     .map(([name, meta]) => `${name}: ${meta.tsType}${meta.nullable ? ' | null' : ''}`)
     .join('\n  ');
@@ -113,7 +112,7 @@ export function generateTableTypes(
     .map(([name, meta]) => `${name}${meta.nullable || meta.hasDefault ? '?' : ''}: ${meta.tsType}${meta.nullable ? ' | null' : ''}`)
     .join('\n  ');
 
-  const updateType = `Partial<Omit<${tableName}Insert, 'id'>> & { id: number }`;
+  const updateType = `Partial<${tableName}Insert>`;
 
   const typeContent = `
 // Auto-generated types for ${tableName}
@@ -127,7 +126,16 @@ export interface ${tableName}Insert {
 
 export type ${tableName}Update = ${updateType};
   `;
-  const generatedDir = join(import.meta.dir, '..', 'generated');
+
+  // Safe determination of directory without tripping strict non-ESNext compilerOptions
+  const baseDir =
+    typeof (import.meta as any)?.dir === 'string'
+      ? (import.meta as any).dir
+      : typeof __dirname !== 'undefined'
+      ? __dirname
+      : process.cwd();
+
+  const generatedDir = join(baseDir, '..', 'generated');
   const typeFilePath = join(generatedDir, `${tableName}.types.ts`);
   if (!existsSync(generatedDir)) {
     mkdirSync(generatedDir, { recursive: true });

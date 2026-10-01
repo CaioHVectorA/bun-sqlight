@@ -159,7 +159,44 @@ describe('Tables and schema', () => {
       .join('products.user_id', 'users.id', { alias: { users: 'U', products: 'P' } });
     expect(query.run()).toBe(queryWithAliasExpected);
   });
-  test.todo('Should be able to return using asKey prop, returning one-to-many in a single object with an array');
+  test('Should be able to return using asKey prop, returning one-to-many in a single object with an array', () => {
+    const freshDb = new DatabaseManager(new QueryBuilder(), new Database(':memory:'));
+    freshDb.createTable('users_rel', (table) => {
+      table.id();
+      table.string('name');
+    });
+    freshDb.createTable('orders_rel', (table) => {
+      table.id();
+      table.string('product');
+      table.foreign('user_id', 'users_rel.id');
+    });
+
+    freshDb.insert('users_rel', { name: 'Alice' }).run();
+    freshDb.insert('users_rel', { name: 'Bob' }).run();
+
+    freshDb.insert('orders_rel', { product: 'Book', user_id: 1 }).run();
+    freshDb.insert('orders_rel', { product: 'Pen', user_id: 1 }).run();
+
+    const results = freshDb
+      .select('*')
+      .from('users_rel')
+      .join('orders_rel.user_id', 'users_rel.id', { asKey: 'orders', type: 'LEFT' })
+      .run() as any[];
+
+    expect(results).toHaveLength(2);
+
+    const alice = results.find((u) => u.name === 'Alice');
+    expect(alice).toBeDefined();
+    expect(alice.orders).toHaveLength(2);
+    expect(alice.orders[0].product).toBe('Book');
+    expect(alice.orders[1].product).toBe('Pen');
+
+    const bob = results.find((u) => u.name === 'Bob');
+    expect(bob).toBeDefined();
+    expect(bob.orders).toHaveLength(0);
+
+    freshDb.close();
+  });
   // with db managment
   test('Should be able to create and a row can be inserted', () => {
     const freshDb = new DatabaseManager(new QueryBuilder(), new Database(':memory:'));

@@ -1,2 +1,10 @@
-// import { Database } from './lib/connect';
 export * from './lib/connect';
+export * from './lib/db-manager';
+export * from './lib/query-builder';
+export * from './lib/schema';
+export * from './lib/schema/primitives';
+export * from './lib/table-repository';
+export * from './lib/transaction';
+export * from './lib/migrator';
+export * from './lib/analyze-is-malicious';
+export * from './lib/errors';

@@ -13,5 +13,5 @@ export interface productsInsert {
   available: boolean
 }
 
-export type productsUpdate = Partial<Omit<productsInsert, 'id'>> & { id: number };
+export type productsUpdate = Partial<productsInsert>;
   

@@ -142,36 +142,67 @@ db.delete('users').where('id', 1)
 
 ---
 
-## 5. Joins
+## 5. Joins & Relacionamentos
 
-*(Seção reservada para futuras explicações sobre joins)*
+- **Descrição:**  
+  O `bun-sqlight` permite realizar `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN` e `FULL JOIN` com suporte a aliases e comparações customizadas.
+  Além disso, resolve um dos maiores desafios de ORMs: **hidratação relacional 1-para-muitos via `asKey`**.
+  
+- **Exemplo de Hidratação 1-para-Muitos:**
+  ```typescript
+  const usersWithOrders = db.select('*')
+    .from('users')
+    .join('orders.user_id', 'users.id', { asKey: 'orders', type: 'LEFT' })
+    .run();
+  ```
+  Ao invés de duplicar registros de usuários em múltiplas linhas, o `bun-sqlight` agrupa os pedidos filhos em um array no campo `orders`:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Alice",
+      "orders": [
+        { "id": 10, "user_id": 1, "product": "Book" },
+        { "id": 11, "user_id": 1, "product": "Pen" }
+      ]
+    }
+  ]
+  ```
 
 ---
 
-## 6. Possíveis Futuros Problemas e Melhorias
+## 6. Meio Termo entre ORM e Query Builder
 
-- **Melhorias na Performance:**  
-  Revisar e otimizar a montagem das queries.
+O `bun-sqlight` atua exatamente na interseção entre a flexibilidade de um Query Builder e a produtividade de um ORM:
 
-- **Implementação de Transações:**  
-  Adicionar suporte a transações.
+1. **Camada de Modelos / Repositórios (`db.table`)**:
+   - `db.table('users').find(1)`
+   - `db.table('users').findOne({ email })`
+   - `db.table('users').findMany({ where, orderBy, limit, offset })`
+   - `db.table('users').create(data)`
+   - `db.table('users').update(id, data)`
+   - `db.table('users').delete(id)`
+   - `db.table('users').count()`
+   - `db.table('users').query()` (para descer ao Query Builder a qualquer instante)
 
-- **Expansão dos Hooks:**  
-  Incluir mais hooks para diferentes operações.
+2. **Transações ACID (`db.transaction`)**:
+   - Controle automático de `BEGIN IMMEDIATE`, `COMMIT` e `ROLLBACK` em caso de erro, com suporte síncrono e assíncrono.
+   - Suporte manual via `db.beginTransaction()`.
 
-- **Suporte a Joins Avançados:**  
-  Desenvolver e documentar joins complexos.
+3. **Sistema de Migrações (`db.migrate` e CLI)**:
+   - Gerenciamento de histórico na tabela `_sqlight_migrations`.
+   - Comandos CLI: `bun-sqlight migrate`, `migrate:rollback`, `migrate:status`, `migrate:create`.
 
-- **Integração com Outras Bibliotecas:**  
-  Facilitar a integração com ORMs.
+4. **Segurança e SafeMode**:
+   - Prevenção ativa de SQL Injection e tautologias (`OR 1=1`).
+   - `safeMode` ativado por padrão para bloquear `UPDATE` e `DELETE` sem cláusula `WHERE`, com bypass explícito via `.allowAll()`.
 
-- **Testes e Cobertura de Código:**  
-  Ampliar a suíte de testes.
+5. **Métricas e Logs de Queries (`options.logger`)**:
+   - Coleta de duração em milissegundos (`durationMs`), tipo de query e timestamp.
 
 ---
 
 ## 7. Considerações Finais
 
 Esta documentação foi elaborada para oferecer uma visão detalhada do funcionamento interno da biblioteca Bun Sqlight.  
-Esperamos que este material facilite a compreensão e a manutenção do sistema, promovendo maior transparência para todos os colaboradores.
-****
+Esperamos que este material facilite a compreensão e a manutenção do sistema, promovendo maior transparência para todos os colaboradores.

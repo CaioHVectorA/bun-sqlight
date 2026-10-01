@@ -11,3 +11,5 @@ export class Sqlight<
     super(new QueryBuilder<TypeTablesSchema, TableNamesSchema>(), new db(filename), options);
   }
 }
+
+export { Sqlight as BunSqlight };
