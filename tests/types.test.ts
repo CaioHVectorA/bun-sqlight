@@ -152,6 +152,32 @@ describe('TypeScript Type Inference and Compile-Time Verification Suite', () => 
     db.close();
   });
 
+  test('Should infer exact types on db.from() QueryBuilder without writing generics', () => {
+    const db = new Sqlight<AppSchema>(':memory:');
+    db.createTable('users', (t) => {
+      t.id();
+      t.string('name');
+      t.string('email');
+    });
+
+    db.table('users').create({ name: 'Bob', email: 'bob@example.com' });
+
+    // NO generics passed to .from(), .where(), .first(), .run()
+    const firstUser = db.from('users').first();
+    type _checkFirst = Expect<Equal<typeof firstUser, UserSelect | null>>;
+    expect(firstUser?.name).toBe('Bob');
+
+    const allUsers = db.from('users').run();
+    type _checkAll = Expect<Equal<typeof allUsers, UserSelect[]>>;
+    expect(allUsers.length).toBe(1);
+
+    const filtered = db.from('users').where('email', 'bob@example.com').first();
+    type _checkFiltered = Expect<Equal<typeof filtered, UserSelect | null>>;
+    expect(filtered?.email).toBe('bob@example.com');
+
+    db.close();
+  });
+
   test('Should support custom type overrides on arbitrary dynamic tables', () => {
     interface Article {
       id: number;

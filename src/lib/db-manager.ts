@@ -26,7 +26,8 @@ export interface SqlightOptions {
 
 export class DatabaseManager<
   TypeTablesSchema extends Record<keyof TypeTablesSchema, TableSchemaShape> = DefaultTypeTables,
-  TableNamesSchema extends keyof TypeTablesSchema & string = keyof TypeTablesSchema & string
+  TableNamesSchema extends keyof TypeTablesSchema & string = keyof TypeTablesSchema & string,
+  CurrentEntity = any
 > {
   public builder: QueryBuilder<TypeTablesSchema, TableNamesSchema>;
   public db: Database;
@@ -185,19 +186,29 @@ export class DatabaseManager<
 
   // QueryBuilder proxy methods
 
-  select<T extends string = any>(
-    ...fields: (string | '*' | (string | '*')[])[]
+  select<K extends (keyof CurrentEntity & string) | (string & {})>(
+    ...fields: (K | '*' | (K | '*')[])[]
   ): this {
-    this.builder.select(...fields);
+    this.builder.select(...(fields as any));
     return this;
   }
 
-  from<T extends string = any>(table: T | AnyTableName<TableNamesSchema>): this {
+  from<K extends TableNamesSchema>(
+    table: K
+  ): DatabaseManager<TypeTablesSchema, TableNamesSchema, TypeTablesSchema[K]['select']>;
+  from<TEntity = any>(
+    table: string
+  ): DatabaseManager<TypeTablesSchema, TableNamesSchema, TEntity>;
+  from(table: string): DatabaseManager<any, any, any> {
     this.builder.from(table);
-    return this;
+    return this as any;
   }
 
-  where(field: string | Record<string, any>, valueOrComparison?: any, value?: any): this {
+  where<K extends (keyof CurrentEntity & string) | (string & {})>(
+    field: K | Partial<CurrentEntity> | Record<string, any>,
+    valueOrComparison?: any,
+    value?: any
+  ): this {
     if (typeof field === 'string') {
       const beforeSelectCallbacks = this.hooks.beforeSelect
         .filter((action) => !!action[field])
@@ -212,22 +223,29 @@ export class DatabaseManager<
     return this;
   }
 
-  orWhere(field: string, valueOrComparison?: any, value?: any): this {
+  orWhere<K extends (keyof CurrentEntity & string) | (string & {})>(
+    field: K,
+    valueOrComparison?: any,
+    value?: any
+  ): this {
     this.builder.orWhere(field, valueOrComparison, value);
     return this;
   }
 
-  whereIn(field: string, values: any[]): this {
+  whereIn<K extends (keyof CurrentEntity & string) | (string & {})>(
+    field: K,
+    values: any[]
+  ): this {
     this.builder.whereIn(field, values);
     return this;
   }
 
-  whereNull(field: string): this {
+  whereNull<K extends (keyof CurrentEntity & string) | (string & {})>(field: K): this {
     this.builder.whereNull(field);
     return this;
   }
 
-  whereNotNull(field: string): this {
+  whereNotNull<K extends (keyof CurrentEntity & string) | (string & {})>(field: K): this {
     this.builder.whereNotNull(field);
     return this;
   }
@@ -242,7 +260,10 @@ export class DatabaseManager<
     return this;
   }
 
-  orderBy(field: string, direction: 'ASC' | 'DESC'): this {
+  orderBy<K extends (keyof CurrentEntity & string) | (string & {})>(
+    field: K,
+    direction: 'ASC' | 'DESC'
+  ): this {
     this.builder.orderBy(field, direction);
     return this;
   }
@@ -323,16 +344,16 @@ export class DatabaseManager<
   /**
    * Executes the query and returns the first row or null.
    */
-  first<T = any>(): T | null {
+  first<T = CurrentEntity>(): T | null {
     this.limit(1);
-    const results = this.run() as T[];
+    const results = this.run<T[]>();
     return results && results.length > 0 ? results[0] : null;
   }
 
   /**
    * Alias for first().
    */
-  get<T = any>(): T | null {
+  get<T = CurrentEntity>(): T | null {
     return this.first<T>();
   }
 
@@ -341,11 +362,11 @@ export class DatabaseManager<
    */
   count(): number {
     this.builder.count();
-    const result = this.run() as any[];
+    const result = this.run<any[]>() as any[];
     return result?.[0]?.count ?? 0;
   }
 
-  run<T = any>(): T {
+  run<T = CurrentEntity[]>(): T {
     // 1. Check for one-to-many hydration via asKey
     if (this.builder.asKeyInfo) {
       const info = this.builder.asKeyInfo;
