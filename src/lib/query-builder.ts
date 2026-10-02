@@ -67,6 +67,8 @@ export interface AsKeyInfo {
   comparison?: string;
 }
 
+export type AnyTableName<TableNamesSchema extends string> = TableNamesSchema | (string & {});
+
 export interface IQueryBuilder<
   TypeTablesSchema extends Record<keyof TypeTablesSchema, TableSchemaShape> = TypeTables,
   TableNamesSchema extends keyof TypeTablesSchema & string = keyof TypeTablesSchema & string
@@ -76,10 +78,10 @@ export interface IQueryBuilder<
   db?: DatabaseManager<TypeTablesSchema, TableNamesSchema>;
   actualQuery: QueryPart[];
   asKeyInfo?: AsKeyInfo;
-  select<T extends TableNamesSchema>(
-    ...fields: (keyof TypeTablesSchema[T]['select'] | '*' | (keyof TypeTablesSchema[T]['select'] | '*')[])[]
+  select<T extends string = any>(
+    ...fields: (string | '*' | (string | '*')[])[]
   ): this;
-  from<T extends TableNamesSchema>(table: T): this;
+  from<T extends string = any>(table: T | AnyTableName<TableNamesSchema>): this;
   where(field: string | Record<string, any>, valueOrComparison?: any, value?: any): this;
   orWhere(field: string, valueOrComparison?: any, value?: any): this;
   whereIn(field: string, values: any[]): this;
@@ -92,17 +94,17 @@ export interface IQueryBuilder<
   limit(limit: number): this;
   offset(offset: number): this;
   allowAll(): this;
-  dropTable<T extends TableNamesSchema>(table: T): this;
+  dropTable<T extends string = any>(table: T | AnyTableName<TableNamesSchema>): this;
   createTable(
     table: string,
     fields: { [key: string]: any } | ((schema: Schema) => void),
     options?: SchemaOptions
   ): this;
-  insert<T extends TableNamesSchema>(
-    table: T,
-    data: TypeTablesSchema[T]['insert'] | TypeTablesSchema[T]['insert'][]
+  insert<T extends string = any>(
+    table: T | AnyTableName<TableNamesSchema>,
+    data: any
   ): this;
-  update<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['update']): this;
+  update<T extends string = any>(table: T | AnyTableName<TableNamesSchema>, data: any): this;
   delete(table: string): this;
   join(
     target: `${string}.${string}`,
@@ -123,8 +125,8 @@ export class QueryBuilder<
   asKeyInfo?: AsKeyInfo;
   bypassSafeWhere = false;
 
-  select<T extends TableNamesSchema>(
-    ...fields: (keyof TypeTablesSchema[T]['select'] | '*' | (keyof TypeTablesSchema[T]['select'] | '*')[])[]
+  select<T extends string = any>(
+    ...fields: (string | '*' | (string | '*')[])[]
   ): this {
     const flatFields: string[] = [];
     for (const item of fields) {
@@ -143,7 +145,7 @@ export class QueryBuilder<
     return this;
   }
 
-  from<T extends TableNamesSchema>(table: T): this {
+  from<T extends string = any>(table: T | AnyTableName<TableNamesSchema>): this {
     this.actualQuery.push({ query: `FROM ${table}`, level: QueryLevel.TABLE });
     return this;
   }
@@ -167,7 +169,7 @@ export class QueryBuilder<
 
     const valFormatted =
       typeof valueToUse === 'string'
-        ? `"${valueToUse}"`
+        ? `"${valueToUse.replace(/"/g, '""')}"`
         : valueToUse === null
         ? 'NULL'
         : valueToUse;
@@ -197,7 +199,11 @@ export class QueryBuilder<
     }
 
     const valFormatted =
-      typeof valueToUse === 'string' ? `"${valueToUse}"` : valueToUse === null ? 'NULL' : valueToUse;
+      typeof valueToUse === 'string'
+        ? `"${valueToUse.replace(/"/g, '""')}"`
+        : valueToUse === null
+        ? 'NULL'
+        : valueToUse;
 
     this.actualQuery.push({
       query: `OR ${field} ${comparison} ${valFormatted}`,
@@ -300,7 +306,7 @@ export class QueryBuilder<
     return this;
   }
 
-  dropTable<T extends TableNamesSchema>(table: T): this {
+  dropTable<T extends string = any>(table: T | AnyTableName<TableNamesSchema>): this {
     this.actualQuery.push({
       query: `DROP TABLE ${table}`,
       level: QueryLevel.TABLE,
@@ -341,9 +347,9 @@ export class QueryBuilder<
     return this;
   }
 
-  insert<T extends TableNamesSchema>(
-    table: T,
-    data: TypeTablesSchema[T]['insert'] | TypeTablesSchema[T]['insert'][]
+  insert<T extends string = any>(
+    table: T | AnyTableName<TableNamesSchema>,
+    data: any
   ): this {
     if (Array.isArray(data)) {
       if (data.length === 0) return this;
@@ -368,10 +374,17 @@ export class QueryBuilder<
     return this;
   }
 
-  update<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['update']): this {
+  update<T extends string = any>(table: T | AnyTableName<TableNamesSchema>, data: any): this {
+    const formatUpdateVal = (val: any) => {
+      if (val === null || val === undefined) return 'NULL';
+      if (typeof val === 'string') return `"${val.replace(/"/g, '""')}"`;
+      if (typeof val === 'boolean') return val ? 1 : 0;
+      if (val instanceof Date) return `"${val.toISOString()}"`;
+      return val;
+    };
     this.actualQuery.push({
       query: `UPDATE ${table} SET ${Object.entries(data as any)
-        .map(([key, value]) => `${key} = ${typeof value === 'string' ? `"${value}"` : value}`)
+        .map(([key, value]) => `${key} = ${formatUpdateVal(value)}`)
         .join(', ')}`,
       level: QueryLevel.CLAUSE,
     });
@@ -480,42 +493,45 @@ export class QueryBuilder<
       return temp;
     }
 
-    // Safety validations
-    const hasSelect = this.actualQuery.some((p) => p.query.startsWith('SELECT'));
-    const hasFrom = this.actualQuery.some((p) => p.query.startsWith('FROM'));
-    if (hasSelect && !hasFrom) {
-      throw new SqlightValidationError('SELECT statement requires a FROM clause');
-    }
-
-    const isUpdateOrDelete = this.actualQuery.some(
-      (p) => p.query.startsWith('UPDATE') || p.query.startsWith('DELETE')
-    );
-    const hasWhere = this.actualQuery.some((p) => p.query.includes('WHERE'));
-    if (isUpdateOrDelete && !hasWhere && !this.bypassSafeWhere) {
-      throw new SqlightSecurityError(
-        'UPDATE or DELETE statement requires a WHERE clause in safeMode (use .allowAll() to override)',
-        'MISSING_WHERE'
-      );
-    }
-
-    const sorted = [...this.actualQuery].sort((a, b) => a.level - b.level);
-
-    // add AND clause logic
-    const queryWithAnd = sorted.map((part, index) => {
-      if (index === 0) return part.query;
-      if (
-        part.level === QueryLevel.WHERE &&
-        sorted[index - 1].level === QueryLevel.WHERE &&
-        !part.query.startsWith('OR') &&
-        !part.query.startsWith('WHERE')
-      ) {
-        return `AND ${part.query}`;
+    try {
+      // Safety validations
+      const hasSelect = this.actualQuery.some((p) => p.query.startsWith('SELECT'));
+      const hasFrom = this.actualQuery.some((p) => p.query.startsWith('FROM'));
+      if (hasSelect && !hasFrom) {
+        throw new SqlightValidationError('SELECT statement requires a FROM clause');
       }
-      return part.query;
-    });
 
-    this.actualQuery = [];
-    this.bypassSafeWhere = false;
-    return queryWithAnd.join(' ');
+      const isUpdateOrDelete = this.actualQuery.some(
+        (p) => p.query.startsWith('UPDATE') || p.query.startsWith('DELETE')
+      );
+      const hasWhere = this.actualQuery.some((p) => p.query.includes('WHERE'));
+      if (isUpdateOrDelete && !hasWhere && !this.bypassSafeWhere) {
+        throw new SqlightSecurityError(
+          'UPDATE or DELETE statement requires a WHERE clause in safeMode (use .allowAll() to override)',
+          'MISSING_WHERE'
+        );
+      }
+
+      const sorted = [...this.actualQuery].sort((a, b) => a.level - b.level);
+
+      // add AND clause logic
+      const queryWithAnd = sorted.map((part, index) => {
+        if (index === 0) return part.query;
+        if (
+          part.level === QueryLevel.WHERE &&
+          sorted[index - 1].level === QueryLevel.WHERE &&
+          !part.query.startsWith('OR') &&
+          !part.query.startsWith('WHERE')
+        ) {
+          return `AND ${part.query}`;
+        }
+        return part.query;
+      });
+
+      return queryWithAnd.join(' ');
+    } finally {
+      this.actualQuery = [];
+      this.bypassSafeWhere = false;
+    }
   }
 }

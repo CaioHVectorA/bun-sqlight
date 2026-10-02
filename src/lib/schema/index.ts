@@ -19,7 +19,7 @@ interface TableSchemaHandles {
   float(name: string, options?: Options<number>): void;
   date(name: string, options?: Options<string>): void;
   datetime(name: string, options?: Options<string>): void;
-  uuid(name?: string): void;
+  uuid(name?: string, options?: Options<string> & { primary?: boolean }): void;
   timestamps(): void;
   foreign(
     name: string,
@@ -106,32 +106,44 @@ export class Schema implements TableSchemaHandles {
     this.addColumn(name, 'DATETIME', options);
   }
 
-  uuid(name = 'id'): void {
-    if (!this.queryBuilder.db) return;
-    this.queryBuilder.db.hooks.beforeInsert.push({
-      [this.table]: (queries) => {
-        const insertIndex = queries.findIndex((q) => q.query.startsWith('INSERT INTO'));
-        if (insertIndex === -1) return;
-        const insertQuery = queries[insertIndex].query;
-        const tableName = insertQuery.split(' ')[2];
-        const fieldsMatch = insertQuery.match(/\(([^)]+)\)/);
-        const valuesMatch = insertQuery.match(/VALUES\s*\(([^)]+)\)/i);
-        if (!fieldsMatch || !valuesMatch) return;
-        const fields = fieldsMatch[1].split(',').map((f) => f.trim());
-        const values = valuesMatch[1].split(',').map((v) => v.trim());
-        fields.push(name);
-        values.push(`"${crypto.randomUUID()}"`);
-        queries[insertIndex].query = `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (${values.join(', ')})`;
-      },
-    });
-    const query = `${name} UUID PRIMARY KEY`;
-    this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
+  uuid(name = 'id', options?: Options<string> & { primary?: boolean }): void {
+    const isPrimary = options?.primary !== undefined ? options.primary : name === 'id';
+    if (this.queryBuilder.db) {
+      this.queryBuilder.db.hooks.beforeInsert.push({
+        [this.table]: (queries) => {
+          const insertIndex = queries.findIndex((q) => q.query.startsWith('INSERT INTO'));
+          if (insertIndex === -1) return;
+          const insertQuery = queries[insertIndex].query;
+          const match = insertQuery.match(/^INSERT INTO\s+(\S+)\s*\(([\s\S]*?)\)\s*VALUES\s*\(([\s\S]*)\)\s*$/i);
+          if (!match) return;
+          const tableName = match[1];
+          const colsStr = match[2];
+          const valsStr = match[3];
+          const cols = colsStr.split(',').map((f) => f.trim());
+          if (!cols.includes(name)) {
+            queries[insertIndex].query = `INSERT INTO ${tableName} (${colsStr}, ${name}) VALUES (${valsStr}, "${crypto.randomUUID()}")`;
+          }
+        },
+      });
+    }
+    const uniqueText = options?.unique ? 'UNIQUE' : '';
+    const nullableText = options?.nullable ? 'NULL' : 'NOT NULL';
+    const query = isPrimary
+      ? `${name} UUID PRIMARY KEY`
+      : `${name} UUID ${uniqueText} ${nullableText}`.replace(/\s+/g, ' ').trim();
+
+    if (isPrimary) {
+      this.queryBuilder.actualQuery.unshift({ query, level: QueryLevel.TABLE });
+    } else {
+      this.queryBuilder.actualQuery.push({ query, level: QueryLevel.TABLE });
+    }
+
     const columnMeta: ColumnMetadata = {
       sqlType: 'UUID',
       tsType: 'string',
-      isPrimary: true,
+      isPrimary,
       hasDefault: true,
-      nullable: false,
+      nullable: options?.nullable || false,
     };
     this.mainQuerybuilder.tables[this.table][name] = columnMeta;
     this.queryBuilder.tables[this.table][name] = columnMeta;
@@ -148,7 +160,7 @@ export class Schema implements TableSchemaHandles {
         if (updateIndex === -1 || whereIndex === -1) return;
         const setClause = queries[updateIndex].query.split('SET')[1].trim();
         const updatedSetClause = `${setClause}, updated_at = CURRENT_TIMESTAMP`;
-        queries[updateIndex].query = `UPDATE ${this.table} SET ${updatedSetClause} ${queries[whereIndex].query}`.replace(/"/g, `'`);
+        queries[updateIndex].query = `UPDATE ${this.table} SET ${updatedSetClause} ${queries[whereIndex].query}`;
         queries[whereIndex].query = '';
       },
     });

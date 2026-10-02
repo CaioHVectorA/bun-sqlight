@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { QueryBuilder, Comparison, QueryLevel, type TableSchemaShape, type JoinOptions } from './query-builder';
+import { QueryBuilder, Comparison, QueryLevel, type TableSchemaShape, type JoinOptions, type AnyTableName } from './query-builder';
 import type { Hooks } from './hooks';
 import { validateSQLQuery } from './analyze-is-malicious';
 import type { Schema } from './schema';
@@ -97,16 +97,16 @@ export class DatabaseManager<
    * Returns a typed TableRepository (ORM Model) for the given table.
    */
   table<TSelect = any, TInsert = Record<string, any>, TUpdate = Partial<TInsert>>(
-    table: string
+    table: string | TableNamesSchema | (string & {})
   ): TableRepository<TSelect, TInsert, TUpdate> {
-    return new TableRepository<TSelect, TInsert, TUpdate>(table, this);
+    return new TableRepository<TSelect, TInsert, TUpdate>(table as string, this);
   }
 
   /**
    * Alias for table().
    */
   model<TSelect = any, TInsert = Record<string, any>, TUpdate = Partial<TInsert>>(
-    table: string
+    table: string | TableNamesSchema | (string & {})
   ): TableRepository<TSelect, TInsert, TUpdate> {
     return this.table<TSelect, TInsert, TUpdate>(table);
   }
@@ -160,14 +160,14 @@ export class DatabaseManager<
 
   // QueryBuilder proxy methods
 
-  select<T extends TableNamesSchema>(
-    ...fields: (keyof TypeTablesSchema[T]['select'] | '*' | (keyof TypeTablesSchema[T]['select'] | '*')[])[]
+  select<T extends string = any>(
+    ...fields: (string | '*' | (string | '*')[])[]
   ): this {
     this.builder.select(...fields);
     return this;
   }
 
-  from<T extends TableNamesSchema>(table: T): this {
+  from<T extends string = any>(table: T | AnyTableName<TableNamesSchema>): this {
     this.builder.from(table);
     return this;
   }
@@ -232,7 +232,7 @@ export class DatabaseManager<
     return this;
   }
 
-  dropTable<T extends TableNamesSchema>(table: T): this {
+  dropTable<T extends string = any>(table: T | AnyTableName<TableNamesSchema>): this {
     const query = this.builder.dropTable(table).run();
     validateSQLQuery(query, { allowUnsafeWhere: !this.options?.safeMode });
     const startTime = performance.now();
@@ -256,25 +256,25 @@ export class DatabaseManager<
     return this;
   }
 
-  insert<T extends TableNamesSchema>(
-    table: T,
-    data: TypeTablesSchema[T]['insert'] | TypeTablesSchema[T]['insert'][]
+  insert<T extends string = any>(
+    table: T | AnyTableName<TableNamesSchema>,
+    data: any
   ): this {
     this.builder.insert(table, data);
     const callbacks = this.hooks.beforeInsert
-      .filter((action) => !!action[table])
-      .map((action) => action[table]);
+      .filter((action) => !!action[table as string])
+      .map((action) => action[table as string]);
     callbacks.forEach((callback) => {
       callback(this.builder.actualQuery);
     });
     return this;
   }
 
-  update<T extends TableNamesSchema>(table: T, data: TypeTablesSchema[T]['update']): this {
+  update<T extends string = any>(table: T | AnyTableName<TableNamesSchema>, data: any): this {
     this.builder.update(table, data);
     const callbacks = this.hooks.beforeUpdate
-      .filter((action) => !!action[table])
-      .map((action) => action[table]);
+      .filter((action) => !!action[table as string])
+      .map((action) => action[table as string]);
     callbacks.forEach((callback) => {
       callback(this.builder.actualQuery);
     });
@@ -320,7 +320,7 @@ export class DatabaseManager<
     return result?.[0]?.count ?? 0;
   }
 
-  run() {
+  run<T = any>(): T {
     // 1. Check for one-to-many hydration via asKey
     if (this.builder.asKeyInfo) {
       const info = this.builder.asKeyInfo;
@@ -381,7 +381,7 @@ export class DatabaseManager<
         }
       }
 
-      return Array.from(parentMap.values());
+      return Array.from(parentMap.values()) as unknown as T;
     }
 
     // 2. Standard query execution
@@ -397,7 +397,7 @@ export class DatabaseManager<
         const res = this.db.query(query).all();
         const durationMs = performance.now() - startTime;
         this.logQuery(query, durationMs, 'SELECT');
-        return res;
+        return res as unknown as T;
       }
 
       const res = this.db.run(query);
@@ -410,7 +410,7 @@ export class DatabaseManager<
         ? 'DELETE'
         : 'EXEC';
       this.logQuery(query, durationMs, type);
-      return res;
+      return res as unknown as T;
     } catch (err: any) {
       throw new SqlightQueryError(err?.message || String(err), query);
     }

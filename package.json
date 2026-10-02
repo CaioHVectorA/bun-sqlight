@@ -1,16 +1,33 @@
 {
-  "name": "bun-sqligth",
-  "module": "index.ts",
-  "main": "dist/out.js",
+  "name": "bun-sqlight",
   "version": "1.0.0",
-  "types": "src/sqlight.d.ts",
+  "description": "A lightweight, zero-dependency, type-safe SQLite abstraction layer for Bun - sweet spot between ORM and Query Builder.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
   "bin": {
     "bun-sqlight": "./dist/cli.js"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs.md",
+    "flux.md",
+    "license"
+  ],
   "scripts": {
     "build": "bun build.ts",
+    "prepublishOnly": "bun run build && bun test",
     "playground": "bun run playground/run-all.ts",
+    "test": "bun test",
     "tsc": "tsc -p tsconfig.types.json"
   },
   "devDependencies": {
@@ -19,5 +36,15 @@
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
-  }
+  },
+  "keywords": [
+    "bun",
+    "sqlite",
+    "orm",
+    "querybuilder",
+    "typescript",
+    "database"
+  ],
+  "author": "CaioHVectorA <caihebatista@gmail.com>",
+  "license": "MIT"
 }
