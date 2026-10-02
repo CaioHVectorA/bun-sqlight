@@ -1,9 +1,9 @@
 import type { DatabaseManager } from './db-manager';
 import type { QueryBuilder } from './query-builder';
 
-export interface FindManyOptions {
-  where?: Record<string, any>;
-  orderBy?: [string, 'ASC' | 'DESC'];
+export interface FindManyOptions<T = any> {
+  where?: Partial<T> | Record<string, any>;
+  orderBy?: [keyof T & string | (string & {}), 'ASC' | 'DESC'];
   limit?: number;
   offset?: number;
 }
@@ -34,7 +34,7 @@ export class TableRepository<
    * Find a single record by its primary key (id).
    */
   find(id: number | string): TSelect | null {
-    return this.findOne({ id });
+    return this.findOne({ id } as any);
   }
 
   /**
@@ -47,7 +47,7 @@ export class TableRepository<
   /**
    * Find a single record matching the given conditions.
    */
-  findOne(where: Record<string, any>): TSelect | null {
+  findOne(where: Partial<TSelect> | Record<string, any>): TSelect | null {
     const results = this.findMany({ where, limit: 1 });
     return results.length > 0 ? results[0] : null;
   }
@@ -55,7 +55,7 @@ export class TableRepository<
   /**
    * Find the first record matching the given conditions (or first record in table).
    */
-  findFirst(where?: Record<string, any>): TSelect | null {
+  findFirst(where?: Partial<TSelect> | Record<string, any>): TSelect | null {
     const results = this.findMany({ where, limit: 1 });
     return results.length > 0 ? results[0] : null;
   }
@@ -63,7 +63,7 @@ export class TableRepository<
   /**
    * Find all records matching criteria.
    */
-  findMany(options?: FindManyOptions): TSelect[] {
+  findMany(options?: FindManyOptions<TSelect>): TSelect[] {
     const qb = this.dbManager.select('*').from(this.tableName as any);
 
     if (options?.where) {
@@ -148,7 +148,7 @@ export class TableRepository<
    * Update records matching given WHERE conditions.
    * Returns the count of rows updated.
    */
-  updateWhere(where: Record<string, any>, data: Partial<TUpdate>): number {
+  updateWhere(where: Partial<TSelect> | Record<string, any>, data: Partial<TUpdate>): number {
     const qb = this.dbManager.update(this.tableName as any, data as any);
     for (const [key, val] of Object.entries(where)) {
       qb.where(key, val);
@@ -162,7 +162,7 @@ export class TableRepository<
    * Delete a record by primary key (id).
    */
   delete(id: number | string): boolean {
-    const changes = this.deleteWhere({ id });
+    const changes = this.deleteWhere({ id } as any);
     return changes > 0;
   }
 
@@ -170,7 +170,7 @@ export class TableRepository<
    * Delete records matching given conditions.
    * Returns the count of deleted rows.
    */
-  deleteWhere(where: Record<string, any>): number {
+  deleteWhere(where: Partial<TSelect> | Record<string, any>): number {
     const qb = this.dbManager.delete(this.tableName as any);
     for (const [key, val] of Object.entries(where)) {
       qb.where(key, val);
@@ -183,7 +183,7 @@ export class TableRepository<
   /**
    * Count records matching criteria.
    */
-  count(where?: Record<string, any>): number {
+  count(where?: Partial<TSelect> | Record<string, any>): number {
     let sql = `SELECT COUNT(*) AS total FROM ${this.tableName}`;
     if (where && Object.keys(where).length > 0) {
       const clauses = Object.entries(where).map(([k, v]) =>
@@ -198,7 +198,7 @@ export class TableRepository<
   /**
    * Check if at least one record exists matching conditions.
    */
-  exists(where: Record<string, any>): boolean {
+  exists(where: Partial<TSelect> | Record<string, any>): boolean {
     return this.count(where) > 0;
   }
 }

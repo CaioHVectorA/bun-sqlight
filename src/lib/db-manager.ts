@@ -95,20 +95,45 @@ export class DatabaseManager<
 
   /**
    * Returns a typed TableRepository (ORM Model) for the given table.
+   * If table matches a table in TypeTablesSchema, its select/insert/update types are automatically inferred!
    */
-  table<TSelect = any, TInsert = Record<string, any>, TUpdate = Partial<TInsert>>(
-    table: string | TableNamesSchema | (string & {})
-  ): TableRepository<TSelect, TInsert, TUpdate> {
-    return new TableRepository<TSelect, TInsert, TUpdate>(table as string, this);
+  table<K extends TableNamesSchema>(
+    table: K
+  ): TableRepository<
+    TypeTablesSchema[K]['select'],
+    TypeTablesSchema[K]['insert'],
+    TypeTablesSchema[K]['update']
+  >;
+  table<
+    TSelect = any,
+    TInsert = Record<string, any>,
+    TUpdate = Partial<TInsert>
+  >(
+    table: string
+  ): TableRepository<TSelect, TInsert, TUpdate>;
+  table(table: string): TableRepository<any, any, any> {
+    return new TableRepository(table, this);
   }
 
   /**
    * Alias for table().
    */
-  model<TSelect = any, TInsert = Record<string, any>, TUpdate = Partial<TInsert>>(
-    table: string | TableNamesSchema | (string & {})
-  ): TableRepository<TSelect, TInsert, TUpdate> {
-    return this.table<TSelect, TInsert, TUpdate>(table);
+  model<K extends TableNamesSchema>(
+    table: K
+  ): TableRepository<
+    TypeTablesSchema[K]['select'],
+    TypeTablesSchema[K]['insert'],
+    TypeTablesSchema[K]['update']
+  >;
+  model<
+    TSelect = any,
+    TInsert = Record<string, any>,
+    TUpdate = Partial<TInsert>
+  >(
+    table: string
+  ): TableRepository<TSelect, TInsert, TUpdate>;
+  model(table: string): TableRepository<any, any, any> {
+    return this.table(table as any);
   }
 
   /**

@@ -494,11 +494,23 @@ export class QueryBuilder<
     }
 
     try {
-      // Safety validations
-      const hasSelect = this.actualQuery.some((p) => p.query.startsWith('SELECT'));
+      let hasSelect = this.actualQuery.some((p) => p.query.startsWith('SELECT'));
       const hasFrom = this.actualQuery.some((p) => p.query.startsWith('FROM'));
       if (hasSelect && !hasFrom) {
         throw new SqlightValidationError('SELECT statement requires a FROM clause');
+      }
+
+      const isMutation = this.actualQuery.some(
+        (p) =>
+          p.query.startsWith('UPDATE') ||
+          p.query.startsWith('DELETE') ||
+          p.query.startsWith('INSERT') ||
+          p.query.startsWith('CREATE') ||
+          p.query.startsWith('DROP')
+      );
+      if (hasFrom && !hasSelect && !isMutation) {
+        this.actualQuery.push({ query: 'SELECT *', level: QueryLevel.CLAUSE });
+        hasSelect = true;
       }
 
       const isUpdateOrDelete = this.actualQuery.some(
